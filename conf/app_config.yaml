@@ -1,0 +1,56 @@
+# 日志配置
+logging:
+  # 文件日志配置
+  file: 
+    enable: true # 是否启用文件日志记录
+    level: INFO # 日志级别
+    path: logs # 日志文件路径
+    rotation: "10 MB" # 日志文件滚动策略
+    retention: "7 days" # 日志文件保留策略
+  # 控制台日志配置
+  console:
+    enable: true # 是否启用控制台日志记录
+    level: INFO # 日志级别
+
+# 元数据数据库配置
+db_meta: 
+  host: localhost # MySQL 主机地址
+  port: 3307 # MySQL 端口号
+  user: data_query_agent # MySQL 用户名
+  password: data_query_123 # MySQL 密码
+  database: meta # MySQL 数据库名
+
+# 数据写入数据库配置
+db_dw: 
+  host: localhost # MySQL 主机地址
+  port: 3307 # MySQL 端口号
+  user: data_query_agent # MySQL 用户名
+  password: data_query_123 # MySQL 密码
+  database: dw # MySQL 数据库名
+
+# Milvus 配置
+milvus: 
+  host: localhost # Milvus 主机地址
+  port: 19530 # Milvus 端口号
+  embedding_size: 1024  # 嵌入向量维度
+  token: "" # Milvus 访问令牌
+
+# Embedding 服务配置
+embedding: 
+  model: text-embedding-v4 # Embedding 模型名称
+  dimension: 1024 # 嵌入向量维度
+  batch_size: 10 # 批次大小
+  api_key: ${oc.env:LLM_API_KEY} # 大模型 API 密钥
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1 # 大模型服务基础 URL
+
+# Elasticsearch 配置
+es: 
+  host: localhost # Elasticsearch 主机地址
+  port: 9201 # Elasticsearch 端口号
+  index_name: data_query_agent # Elasticsearch 索引名称
+
+# 大模型配置
+llm: 
+  model_name: qwen3.6-plus # 大模型模型名称
+  api_key: ${oc.env:LLM_API_KEY} # 大模型 API 密钥
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1 # 大模型服务基础 URL
