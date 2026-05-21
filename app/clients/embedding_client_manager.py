@@ -5,7 +5,6 @@ Embedding 客户端管理器
 提供统一访问入口
 """
 
-import asyncio
 from typing import Optional
 
 from openai import AsyncOpenAI

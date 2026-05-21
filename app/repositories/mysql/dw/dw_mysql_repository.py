@@ -52,3 +52,11 @@ class DWMySQLRepository:
         """执行最终 SQL，并把 SQLAlchemy 行对象转换成前端更易消费的字典列表"""
         result = await self.session.execute(text(sql))
         return [dict(row) for row in result.mappings().fetchall()]
+
+    async def run_safe(self, sql: str, timeout_seconds: int) -> list[dict]:
+        """设置查询超时后执行已通过安全网关的 SQL"""
+        timeout_ms = int(timeout_seconds * 1000)
+        # 设置查询超时时间
+        await self.session.execute(text(f"SET SESSION MAX_EXECUTION_TIME = {timeout_ms}"))
+        result = await self.session.execute(text(sql))
+        return [dict(row) for row in result.mappings().fetchall()]

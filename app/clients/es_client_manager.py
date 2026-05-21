@@ -5,7 +5,6 @@ Elasticsearch 客户端管理器
 主要服务于字段真实取值的全文索引构建和检索
 """
 
-import asyncio
 from typing import Optional
 
 from elasticsearch import AsyncElasticsearch

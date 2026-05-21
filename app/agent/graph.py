@@ -7,8 +7,6 @@ Data Query Agent 图编排
 随后合并召回结果 过滤候选表和指标 补充额外上下文，最后生成 校验 修正并执行 SQL
 """
 
-import asyncio
-
 from langgraph.constants import END, START
 from langgraph.graph import StateGraph
 
@@ -16,6 +14,7 @@ from app.agent.context import DataQueryAgentContext
 from app.agent.nodes.add_extra_context import add_extra_context
 from app.agent.nodes.correct_sql import correct_sql
 from app.agent.nodes.extract_keywords import extract_keywords
+from app.agent.nodes.fail_query import fail_query
 from app.agent.nodes.filter_metric import filter_metric
 from app.agent.nodes.filter_table import filter_table
 from app.agent.nodes.generate_sql import generate_sql
@@ -24,20 +23,9 @@ from app.agent.nodes.recall_column import recall_column
 from app.agent.nodes.recall_metric import recall_metric
 from app.agent.nodes.recall_value import recall_value
 from app.agent.nodes.run_sql import run_sql
+from app.agent.nodes.security_check_sql import security_check_sql
 from app.agent.nodes.validate_sql import validate_sql
 from app.agent.state import DataQueryAgentState
-from app.clients.embedding_client_manager import embedding_client_manager
-from app.clients.es_client_manager import es_client_manager
-from app.clients.milvus_client_manager import milvus_client_manager
-from app.clients.mysql_client_manager import (
-    dw_mysql_client_manager,
-    meta_mysql_client_manager,
-)
-from app.repositories.es.value_es_repository import ValueESRepository
-from app.repositories.mysql.dw.dw_mysql_repository import DWMySQLRepository
-from app.repositories.mysql.meta.meta_mysql_repository import MetaMySQLRepository
-from app.repositories.vector.column_vector_repository import ColumnVectorRepository
-from app.repositories.vector.metric_vector_repository import MetricVectorRepository
 
 # StateGraph 声明整张图使用的状态结构和运行时上下文结构
 graph_builder = StateGraph(
@@ -54,14 +42,16 @@ graph_builder.add_node("filter_metric", filter_metric) # 过滤指标信息
 graph_builder.add_node("filter_table", filter_table) # 过滤候选表
 graph_builder.add_node("add_extra_context", add_extra_context) # 添加额外上下文
 graph_builder.add_node("generate_sql", generate_sql) # 生成 SQL
+graph_builder.add_node("security_check_sql", security_check_sql) # SQL 安全检查
 graph_builder.add_node("validate_sql", validate_sql) # 校验 SQL
 graph_builder.add_node("correct_sql", correct_sql) # 修正 SQL
 graph_builder.add_node("run_sql", run_sql) # 执行 SQL
+graph_builder.add_node("fail_query", fail_query) # 失败终止
 
 # 从用户问题开始，先抽取关键词作为后续检索的基础
 graph_builder.add_edge(START, "extract_keywords")
 
-# 关键词抽取后并行进入三类召回，分别面向字段 字段值和业务指标
+# 关键词抽取后并行进入三路召回，分别面向字段 字段值和业务指标
 graph_builder.add_edge("extract_keywords", "recall_column")
 graph_builder.add_edge("extract_keywords", "recall_value")
 graph_builder.add_edge("extract_keywords", "recall_metric")
@@ -79,16 +69,30 @@ graph_builder.add_edge("merge_retrieved_info", "filter_metric")
 graph_builder.add_edge("filter_table", "add_extra_context")
 graph_builder.add_edge("filter_metric", "add_extra_context")
 graph_builder.add_edge("add_extra_context", "generate_sql")
-graph_builder.add_edge("generate_sql", "validate_sql")
+graph_builder.add_edge("generate_sql", "security_check_sql")
 
-# SQL 校验通过就直接执行，校验失败则先进入修正节点
+# SQL 安全检查失败则终止，通过后再交给数据库做语法和环境校验
+graph_builder.add_conditional_edges(
+    source="security_check_sql",
+    path=lambda state: "fail_query" if state.get("error_type") == "security" else "validate_sql",
+    path_map={"validate_sql": "validate_sql", "fail_query": "fail_query"},
+)
+
+# SQL 校验通过就执行；校验失败时只允许修正一次，修正后必须重新经过安全检查
 graph_builder.add_conditional_edges( # 添加校验 SQL 条件分支
     source="validate_sql", # 从该节点开始判断
-    path=lambda state: "run_sql" if state["error"] is None else "correct_sql", # 校验通过则执行 SQL，否则修正 SQL
-    path_map={"run_sql": "run_sql", "correct_sql": "correct_sql"}, # 把 path 返回值映射到实际节点名称
+    path=lambda state: "run_sql"
+    if state["error"] is None
+    else ("fail_query" if state.get("correction_attempts", 0) >= 1 else "correct_sql"),
+    path_map={
+        "run_sql": "run_sql",
+        "correct_sql": "correct_sql",
+        "fail_query": "fail_query",
+    },
 )
-graph_builder.add_edge("correct_sql", "run_sql")
+graph_builder.add_edge("correct_sql", "security_check_sql")
 graph_builder.add_edge("run_sql", END)
+graph_builder.add_edge("fail_query", END)
 
 # 编译后的 graph 是对外使用的 Agent 执行入口
 graph = graph_builder.compile()

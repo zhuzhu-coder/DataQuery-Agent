@@ -17,6 +17,7 @@ from app.clients.mysql_client_manager import (
     dw_mysql_client_manager,
     meta_mysql_client_manager,
 )
+from app.repositories.mysql.meta.query_audit_repository import QueryAuditRepository
 
 
 @asynccontextmanager # 异步上下文管理器
@@ -29,6 +30,9 @@ async def lifespan(app: FastAPI):
     es_client_manager.init() # 初始化 Elasticsearch 客户端
     meta_mysql_client_manager.init() # 初始化元数据库 MySQL 客户端
     dw_mysql_client_manager.init() # 初始化数据仓库 MySQL 客户端
+    # 确保元数据库中存在查询审计表
+    async with meta_mysql_client_manager.session_factory() as meta_session:
+        await QueryAuditRepository(meta_session).ensure_table()
 
     # yield 之前是启动逻辑，yield 之后是关闭逻辑；中间阶段由 FastAPI 正常处理请求
     yield

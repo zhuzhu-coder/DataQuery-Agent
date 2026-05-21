@@ -6,8 +6,6 @@
 主要目标是把整条构建链路稳定地启动起来
 """
 
-import argparse
-import asyncio
 from pathlib import Path
 
 from app.clients.embedding_client_manager import embedding_client_manager

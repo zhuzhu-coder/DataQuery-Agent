@@ -14,6 +14,7 @@ from app.clients.embedding_client_manager import EmbeddingClient
 from app.repositories.es.value_es_repository import ValueESRepository
 from app.repositories.mysql.dw.dw_mysql_repository import DWMySQLRepository
 from app.repositories.mysql.meta.meta_mysql_repository import MetaMySQLRepository
+from app.repositories.mysql.meta.query_audit_repository import QueryAuditRepository
 from app.repositories.vector.column_vector_repository import ColumnVectorRepository
 from app.repositories.vector.metric_vector_repository import MetricVectorRepository
 
@@ -33,3 +34,5 @@ class DataQueryAgentContext(TypedDict):
     meta_mysql_repository: MetaMySQLRepository
     # 数仓仓储，负责在额外上下文补全时读取数据库方言 版本等执行环境信息
     dw_mysql_repository: DWMySQLRepository
+    # 查询审计仓储，负责记录 SQL 生成 校验 执行状态
+    query_audit_repository: QueryAuditRepository

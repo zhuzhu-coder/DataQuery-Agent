@@ -65,6 +65,12 @@ async def generate_sql(state: DataQueryAgentState, runtime: Runtime[DataQueryAge
             }
         )
         logger.info(f"生成的SQL：{result}")
+        # 记录刚生成的 SQL 到审计表中
+        if state.get("audit_id") and runtime.context.get("query_audit_repository"):
+            await runtime.context["query_audit_repository"].update_sql(
+                state["audit_id"],
+                generated_sql=result,
+            )
         writer({"type": "progress", "step": step, "status": "success"})
         return {"sql": result}
 

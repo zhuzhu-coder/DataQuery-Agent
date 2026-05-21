@@ -77,3 +77,6 @@ class DataQueryAgentState(TypedDict):
     sql: str  # 生成或校正后的SQL
 
     error: str  # 校验SQL时出现的错误信息
+    error_type: str  # 错误类型，如 syntax/security
+    correction_attempts: int  # SQL 修正次数
+    audit_id: str  # 查询审计记录 ID

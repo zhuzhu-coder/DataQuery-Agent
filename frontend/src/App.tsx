@@ -48,6 +48,14 @@ function stopRunningSteps(steps: StepState[] = []) {
   );
 }
 
+function markQueryFailed(steps: StepState[] = []) {
+  return upsertStep(stopRunningSteps(steps), {
+    type: "progress",
+    step: "查询终止",
+    status: "error",
+  });
+}
+
 export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -123,6 +131,7 @@ export default function App() {
             status: "error",
             content: "这次查询没有成功。",
             error: event.message,
+            steps: markQueryFailed(message.steps),
           };
         }),
       );

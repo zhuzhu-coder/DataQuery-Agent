@@ -7,9 +7,6 @@ MySQL 客户端管理器
 方便脚本入口 服务层和仓储层按统一方式访问数据库
 """
 
-import asyncio
-
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     async_sessionmaker,

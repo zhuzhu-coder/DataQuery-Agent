@@ -24,6 +24,7 @@ from app.clients.mysql_client_manager import (
 from app.repositories.es.value_es_repository import ValueESRepository
 from app.repositories.mysql.dw.dw_mysql_repository import DWMySQLRepository
 from app.repositories.mysql.meta.meta_mysql_repository import MetaMySQLRepository
+from app.repositories.mysql.meta.query_audit_repository import QueryAuditRepository
 from app.repositories.vector.column_vector_repository import ColumnVectorRepository
 from app.repositories.vector.metric_vector_repository import MetricVectorRepository
 from app.services.query_service import QueryService
@@ -84,6 +85,14 @@ async def get_value_es_repository() -> ValueESRepository:
     return ValueESRepository(es_client_manager.client)
 
 
+async def get_query_audit_repository(
+    session: Annotated[AsyncSession, Depends(get_meta_session)],
+) -> QueryAuditRepository:
+    """创建查询审计仓储"""
+
+    return QueryAuditRepository(session)
+
+
 async def get_query_service(
     meta_mysql_repository: Annotated[
         MetaMySQLRepository, Depends(get_meta_mysql_repository)
@@ -101,6 +110,9 @@ async def get_query_service(
         MetricVectorRepository, Depends(get_metric_vector_repository)
     ],
     value_es_repository: Annotated[ValueESRepository, Depends(get_value_es_repository)],
+    query_audit_repository: Annotated[
+        QueryAuditRepository, Depends(get_query_audit_repository)
+    ],
 ) -> QueryService:
     """组装一次查询所需的业务服务"""
 
@@ -112,4 +124,5 @@ async def get_query_service(
         column_vector_repository=column_vector_repository, # 字段向量仓储
         metric_vector_repository=metric_vector_repository, # 指标向量仓储
         value_es_repository=value_es_repository, # 字段取值全文检索仓储
+        query_audit_repository=query_audit_repository, # 查询审计仓储
     )

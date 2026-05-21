@@ -91,6 +91,17 @@ class LLMConfig:
 
 
 @dataclass
+class SQLSecurityConfig:
+    """SQL 安全治理配置"""
+
+    enabled: bool # 是否启用 SQL 安全检查
+    max_rows: int # 最大返回行数
+    timeout_seconds: int # SQL 执行超时时间
+    allowed_functions: list[str] # 允许使用的 SQL 函数
+    forbid_cross_database: bool # 是否禁止跨库查询
+
+
+@dataclass
 class AppConfig:
     """项目级总配置入口"""
 
@@ -101,6 +112,7 @@ class AppConfig:
     embedding: EmbeddingConfig # Embedding 服务配置
     es: ESConfig # Elasticsearch 配置
     llm: LLMConfig # 大模型调用配置
+    sql_security: SQLSecurityConfig # SQL 安全治理配置
 
 
 # 从当前文件位置回到项目根目录，再定位到 conf/app_config.yaml
@@ -118,4 +130,3 @@ schema = OmegaConf.structured(AppConfig)
 
 # 把配置结构和配置值合并，再转换成可以直接按属性访问的对象
 app_config: AppConfig = OmegaConf.to_object(OmegaConf.merge(schema, context))
-

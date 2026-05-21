@@ -8,7 +8,6 @@
 以及指标入库和指标向量索引构建逻辑
 """
 
-import asyncio
 import uuid
 from dataclasses import asdict
 from pathlib import Path
