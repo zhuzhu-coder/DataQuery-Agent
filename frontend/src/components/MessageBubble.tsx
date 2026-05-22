@@ -10,6 +10,8 @@ import type { ChatMessage } from "../types/agent";
 
 export function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
+  const isProcessMessage = message.kind === "process";
+  const shouldShowContent = isUser || !isProcessMessage || (!message.steps?.length && message.result === undefined);
 
   const copy = async () => {
     const text = message.result ? toClipboardText(message.result) : message.content;
@@ -28,12 +30,14 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
           )}
         >
           <div className="flex items-start justify-between gap-3">
-            <p className="whitespace-pre-wrap text-[15px] leading-7">{message.content}</p>
+            {shouldShowContent && (
+              <p className="whitespace-pre-wrap text-[15px] leading-7">{message.content}</p>
+            )}
             {!isUser && message.status !== "streaming" && (
               <button
                 type="button"
                 onClick={copy}
-                className="shrink-0 rounded-full p-1.5 text-sky-500 opacity-0 outline-none transition-all duration-150 hover:-translate-y-0.5 hover:bg-sky-50 hover:text-sky-700 hover:shadow-md hover:shadow-sky-100 focus:-translate-y-0.5 focus:opacity-100 focus:ring-4 focus:ring-sky-100 group-hover:opacity-100"
+                className="ml-auto shrink-0 rounded-full p-1.5 text-sky-500 opacity-0 outline-none transition-all duration-150 hover:-translate-y-0.5 hover:bg-sky-50 hover:text-sky-700 hover:shadow-md hover:shadow-sky-100 focus:-translate-y-0.5 focus:opacity-100 focus:ring-4 focus:ring-sky-100 group-hover:opacity-100"
                 title="复制"
                 aria-label="复制"
               >

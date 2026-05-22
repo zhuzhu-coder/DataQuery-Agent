@@ -80,3 +80,5 @@ class DataQueryAgentState(TypedDict):
     error_type: str  # 错误类型，如 syntax/security
     correction_attempts: int  # SQL 修正次数
     audit_id: str  # 查询审计记录 ID
+    intent_category: str  # 入口意图分类，如 data_query/general_chat/unsafe
+    intent_reason: str  # 入口意图分类原因

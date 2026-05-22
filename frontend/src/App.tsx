@@ -97,6 +97,7 @@ export default function App() {
     const assistantMessage: ChatMessage = {
       id: assistantId,
       role: "assistant",
+      kind: "process",
       content: "正在连接智能问数助手...",
       createdAt: Date.now(),
       status: "streaming",
@@ -110,8 +111,55 @@ export default function App() {
     setMessages((current) => [...current, userMessage, assistantMessage]);
 
     const onEvent = (event: AgentEvent) => {
-      setMessages((current) =>
-        current.map((message) => {
+      setMessages((current) => {
+        if (event.type === "result") {
+          const answerMessage: ChatMessage = {
+            id: makeId(),
+            role: "assistant",
+            kind: "answer",
+            content: summarizeResult(event.data),
+            createdAt: Date.now(),
+            status: "done",
+          };
+          return [
+            ...current.map((message) =>
+              message.id === assistantId
+                ? {
+                    ...message,
+                    status: "done" as const,
+                    content: "",
+                    result: event.data,
+                  }
+                : message,
+            ),
+            answerMessage,
+          ];
+        }
+
+        if (event.type === "answer") {
+          const answerMessage: ChatMessage = {
+            id: makeId(),
+            role: "assistant",
+            kind: "answer",
+            content: event.content,
+            createdAt: Date.now(),
+            status: "done",
+          };
+          return [
+            ...current.map((message) =>
+              message.id === assistantId
+                ? {
+                    ...message,
+                    status: "done" as const,
+                    content: "",
+                  }
+                : message,
+            ),
+            answerMessage,
+          ];
+        }
+
+        return current.map((message) => {
           if (message.id !== assistantId) return message;
 
           if (event.type === "progress") {
@@ -129,15 +177,6 @@ export default function App() {
             };
           }
 
-          if (event.type === "result") {
-            return {
-              ...message,
-              status: "done",
-              content: summarizeResult(event.data),
-              result: event.data,
-            };
-          }
-
           return {
             ...message,
             status: "error",
@@ -145,8 +184,8 @@ export default function App() {
             error: event.message,
             steps: markQueryFailed(message.steps),
           };
-        }),
-      );
+        });
+      });
     };
 
     try {

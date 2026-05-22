@@ -16,6 +16,11 @@ export type ResultEvent = {
   data: unknown;
 };
 
+export type AnswerEvent = {
+  type: "answer";
+  content: string;
+};
+
 export type ErrorEvent = {
   type: "error";
   message: string;
@@ -35,7 +40,7 @@ export type TraceEvent = {
   metadata?: Record<string, unknown>;
 };
 
-export type AgentEvent = ProgressEvent | ResultEvent | ErrorEvent | TraceEvent;
+export type AgentEvent = ProgressEvent | ResultEvent | AnswerEvent | ErrorEvent | TraceEvent;
 
 export type StepState = {
   step: string;
@@ -50,6 +55,7 @@ export type TraceState = TraceEvent & {
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
+  kind?: "process" | "answer";
   content: string;
   createdAt: number;
   status?: "streaming" | "done" | "error";

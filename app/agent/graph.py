@@ -17,11 +17,13 @@ from app.agent.nodes.extract_keywords import extract_keywords
 from app.agent.nodes.fail_query import fail_query
 from app.agent.nodes.filter_metric import filter_metric
 from app.agent.nodes.filter_table import filter_table
+from app.agent.nodes.general_answer import general_answer
 from app.agent.nodes.generate_sql import generate_sql
 from app.agent.nodes.merge_retrieved_info import merge_retrieved_info
 from app.agent.nodes.recall_column import recall_column
 from app.agent.nodes.recall_metric import recall_metric
 from app.agent.nodes.recall_value import recall_value
+from app.agent.nodes.route_user_intent import route_user_intent
 from app.agent.nodes.run_sql import run_sql
 from app.agent.nodes.security_check_sql import security_check_sql
 from app.agent.nodes.validate_sql import validate_sql
@@ -33,6 +35,8 @@ graph_builder = StateGraph(
 )
 
 # 注册节点：每个节点负责问数链路中的一个清晰步骤
+graph_builder.add_node("route_user_intent", route_user_intent) # 意图安全检查和话题路由
+graph_builder.add_node("general_answer", general_answer) # 普通回答
 graph_builder.add_node("extract_keywords", extract_keywords) # 抽取用户问题关键词
 graph_builder.add_node("recall_column", recall_column) # 召回字段信息
 graph_builder.add_node("recall_value", recall_value) # 召回字段取值
@@ -48,8 +52,24 @@ graph_builder.add_node("correct_sql", correct_sql) # 修正 SQL
 graph_builder.add_node("run_sql", run_sql) # 执行 SQL
 graph_builder.add_node("fail_query", fail_query) # 失败终止
 
-# 从用户问题开始，先抽取关键词作为后续检索的基础
-graph_builder.add_edge(START, "extract_keywords")
+# 从用户问题开始，先做意图安全检查和话题路由
+graph_builder.add_edge(START, "route_user_intent")
+
+graph_builder.add_conditional_edges(
+    source="route_user_intent",
+    path=lambda state: "fail_query" # 失败意图直接终止
+    if state.get("error_type") == "security"
+    else (
+        "general_answer" # 普通意图直接普通回答
+        if state.get("intent_category") == "general_chat"
+        else "extract_keywords" # 非查数问题抽取关键词
+    ),
+    path_map={
+        "extract_keywords": "extract_keywords",
+        "general_answer": "general_answer",
+        "fail_query": "fail_query",
+    },
+)
 
 # 关键词抽取后并行进入三路召回，分别面向字段 字段值和业务指标
 graph_builder.add_edge("extract_keywords", "recall_column")
@@ -93,6 +113,7 @@ graph_builder.add_conditional_edges( # 添加校验 SQL 条件分支
 graph_builder.add_edge("correct_sql", "security_check_sql")
 graph_builder.add_edge("run_sql", END)
 graph_builder.add_edge("fail_query", END)
+graph_builder.add_edge("general_answer", END)
 
 # 编译后的 graph 是对外使用的 Agent 执行入口
 graph = graph_builder.compile()
