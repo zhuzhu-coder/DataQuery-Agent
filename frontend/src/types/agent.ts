@@ -21,11 +21,29 @@ export type ErrorEvent = {
   message: string;
 };
 
-export type AgentEvent = ProgressEvent | ResultEvent | ErrorEvent;
+export type TraceItem = {
+  label: string;
+  detail?: string;
+};
+
+export type TraceEvent = {
+  type: "trace";
+  step: string;
+  title: string;
+  summary?: string;
+  items?: TraceItem[];
+  metadata?: Record<string, unknown>;
+};
+
+export type AgentEvent = ProgressEvent | ResultEvent | ErrorEvent | TraceEvent;
 
 export type StepState = {
   step: string;
   status: StepStatus;
+  updatedAt: number;
+};
+
+export type TraceState = TraceEvent & {
   updatedAt: number;
 };
 
@@ -36,6 +54,7 @@ export type ChatMessage = {
   createdAt: number;
   status?: "streaming" | "done" | "error";
   steps?: StepState[];
+  traces?: TraceState[];
   result?: unknown;
   error?: string;
 };

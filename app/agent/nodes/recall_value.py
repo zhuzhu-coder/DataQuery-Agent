@@ -13,6 +13,7 @@ from langgraph.runtime import Runtime
 from app.agent.context import DataQueryAgentContext
 from app.agent.llm import llm
 from app.agent.state import DataQueryAgentState
+from app.agent.trace import emit_trace, value_trace_items
 from app.core.log import logger
 from app.entities.value_info import ValueInfo
 from app.prompt.prompt_loader import load_prompt
@@ -70,6 +71,14 @@ async def recall_value(state: DataQueryAgentState, runtime: Runtime[DataQueryAge
         retrieved_value_infos: list[ValueInfo] = list(value_infos_map.values())
         logger.info(f"检索到字段取值：{list(value_infos_map.keys())}")
         writer({"type": "progress", "step": step, "status": "success"})
+        emit_trace(
+            writer,
+            step=step,
+            title=f"命中 {len(retrieved_value_infos)} 个字段取值",
+            summary="从字段值索引中召回可能用于 WHERE 条件的真实业务取值。",
+            items=value_trace_items(retrieved_value_infos),
+            metadata={"value_count": len(retrieved_value_infos)},
+        )
         return {"retrieved_value_infos": retrieved_value_infos}
     except Exception as e:
         logger.error(f"{step} failed: {e}")

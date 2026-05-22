@@ -98,6 +98,8 @@ class SQLSecurityService:
         alias_to_table: dict[str, str],
     ):
         """检查 SQL 中的字段是否在白名单中"""
+        select_aliases = self._select_aliases(expression)
+
         for star in expression.find_all(exp.Star):
             if not isinstance(star.parent, exp.Count):
                 raise SQLSecurityError("不允许使用 SELECT *")
@@ -112,6 +114,9 @@ class SQLSecurityService:
                     raise SQLSecurityError(f"字段表别名不在白名单中：{table_qualifier}")
                 if column_name not in allowed_columns_by_table[table_name]:
                     raise SQLSecurityError(f"字段不在白名单中：{column.sql()}")
+                continue
+            # ORDER BY 可以引用 SELECT 里定义的输出别名，例如 SUM(amount) AS 销售额
+            if column_name in select_aliases and self._is_order_by_alias_reference(column):
                 continue
             # 字段不带表名或别名，检查是否在白名单中
             candidate_tables = [
@@ -128,6 +133,9 @@ class SQLSecurityService:
         """检查 SQL 中的函数是否在白名单中"""
         allowed_functions = {name.upper() for name in self.allowed_functions}
         for function in expression.find_all(exp.Func):
+            # sqlglot 中 AND/OR/算术表达式也继承自 Func，它们是 SQL 运算符，不按函数白名单校验
+            if isinstance(function, exp.Binary):
+                continue
             function_name = function.sql_name().upper()
             if function_name not in allowed_functions:
                 raise SQLSecurityError(f"函数不在白名单中：{function_name}")
@@ -153,3 +161,22 @@ class SQLSecurityService:
             return int(limit_expression.this)
         except (TypeError, ValueError):
             return None
+
+    def _select_aliases(self, expression: exp.Expression) -> set[str]:
+        """从 SELECT 子句中提取所有输出别名"""
+        if not isinstance(expression, exp.Select):
+            return set()
+        return {
+            alias
+            for projection in expression.expressions
+            if (alias := projection.alias)
+        }
+
+    def _is_order_by_alias_reference(self, column: exp.Column) -> bool:
+        """检查字段是否是 ORDER BY 子句引用的输出别名"""
+        parent = column.parent
+        while parent is not None and not isinstance(parent, exp.Select):
+            if isinstance(parent, exp.Order):
+                return True
+            parent = parent.parent
+        return False

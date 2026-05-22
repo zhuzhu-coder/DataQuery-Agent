@@ -11,6 +11,7 @@ from langgraph.runtime import Runtime
 
 from app.agent.context import DataQueryAgentContext
 from app.agent.state import DataQueryAgentState
+from app.agent.trace import emit_trace
 from app.conf.app_config import app_config
 from app.core.log import logger
 
@@ -51,6 +52,14 @@ async def run_sql(state: DataQueryAgentState, runtime: Runtime[DataQueryAgentCon
                 duration_ms=duration_ms,
             )
         writer({"type": "progress", "step": step, "status": "success"})
+        emit_trace(
+            writer,
+            step=step,
+            title=f"执行完成，返回 {len(result)} 行",
+            summary=f"SQL 执行用时 {duration_ms}ms。",
+            items=_result_trace_items(result),
+            metadata={"row_count": len(result), "duration_ms": duration_ms},
+        )
         writer({"type": "result", "data": result})
 
     except Exception as e:
@@ -63,3 +72,19 @@ async def run_sql(state: DataQueryAgentState, runtime: Runtime[DataQueryAgentCon
             )
         writer({"type": "progress", "step": step, "status": "error"})
         raise
+
+
+def _result_trace_items(result: list[dict]) -> list[dict[str, str]]:
+    if not result:
+        return [{"label": "返回结果", "detail": "无数据"}]
+
+    first_row = result[0]
+    if not isinstance(first_row, dict):
+        return [{"label": "返回结果", "detail": "已返回非字典结构结果"}]
+
+    return [
+        {
+            "label": "返回字段",
+            "detail": ", ".join(str(key) for key in first_row.keys()),
+        }
+    ]

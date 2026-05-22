@@ -13,6 +13,7 @@ from langgraph.runtime import Runtime
 from app.agent.context import DataQueryAgentContext
 from app.agent.llm import llm
 from app.agent.state import DataQueryAgentState, TableInfoState
+from app.agent.trace import emit_trace, table_trace_items
 from app.core.log import logger
 from app.prompt.prompt_loader import load_prompt
 
@@ -61,6 +62,21 @@ async def filter_table(state: DataQueryAgentState, runtime: Runtime[DataQueryAge
             f"过滤后的表信息：{[filtered_table_info['name'] for filtered_table_info in filtered_table_infos]}"
         )
         writer({"type": "progress", "step": step, "status": "success"})
+        column_count = sum(
+            len(filtered_table_info["columns"])
+            for filtered_table_info in filtered_table_infos
+        )
+        emit_trace(
+            writer,
+            step=step,
+            title=f"保留 {len(filtered_table_infos)} 张表、{column_count} 个字段",
+            summary="从候选表结构中裁剪出 SQL 生成真正需要的表和字段。",
+            items=table_trace_items(filtered_table_infos),
+            metadata={
+                "table_count": len(filtered_table_infos),
+                "field_count": column_count,
+            },
+        )
         return {"table_infos": filtered_table_infos}
 
     except Exception as e:

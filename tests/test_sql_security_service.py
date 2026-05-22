@@ -13,6 +13,8 @@ class SQLSecurityServiceTest(unittest.TestCase):
                 "columns": [
                     {"name": "order_id"},
                     {"name": "order_amount"},
+                    {"name": "product_id"},
+                    {"name": "date_id"},
                     {"name": "region_id"},
                 ],
             },
@@ -23,6 +25,23 @@ class SQLSecurityServiceTest(unittest.TestCase):
                 "columns": [
                     {"name": "region_id"},
                     {"name": "region_name"},
+                ],
+            },
+            {
+                "name": "dim_product",
+                "role": "dim",
+                "description": "商品维度表",
+                "columns": [
+                    {"name": "product_id"},
+                    {"name": "product_name"},
+                ],
+            },
+            {
+                "name": "dim_date",
+                "role": "dim",
+                "description": "日期维度表",
+                "columns": [
+                    {"name": "date_id"},
                 ],
             },
         ]
@@ -112,6 +131,38 @@ class SQLSecurityServiceTest(unittest.TestCase):
         )
 
         self.assertTrue(safe_sql.endswith("LIMIT 200"))
+
+    def test_allows_order_by_select_alias(self):
+        safe_sql = self.service.validate_and_rewrite(
+            "SELECT SUM(order_amount) AS 销售额 "
+            "FROM fact_order "
+            "ORDER BY 销售额 DESC "
+            "LIMIT 5",
+            self.table_infos,
+        )
+
+        self.assertIn("AS 销售额", safe_sql)
+        self.assertIn("ORDER BY 销售额 DESC", safe_sql)
+        self.assertTrue(safe_sql.endswith("LIMIT 5"))
+
+    def test_allows_generated_product_sales_sql(self):
+        safe_sql = self.service.validate_and_rewrite(
+            "SELECT p.product_name AS 商品名称, "
+            "SUM(f.order_amount) AS 销售额 "
+            "FROM fact_order f "
+            "JOIN dim_product p ON f.product_id = p.product_id "
+            "JOIN dim_date d ON f.date_id = d.date_id "
+            "JOIN dim_region r ON f.region_id = r.region_id "
+            "WHERE r.region_name = '华东' "
+            "AND d.date_id BETWEEN 20250101 AND 20250331 "
+            "GROUP BY p.product_name "
+            "ORDER BY 销售额 DESC "
+            "LIMIT 5",
+            self.table_infos,
+        )
+
+        self.assertIn("ORDER BY 销售额 DESC", safe_sql)
+        self.assertTrue(safe_sql.endswith("LIMIT 5"))
 
     def test_rejects_disallowed_function(self):
         with self.assertRaises(SQLSecurityError):

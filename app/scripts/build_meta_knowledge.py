@@ -6,6 +6,8 @@
 主要目标是把整条构建链路稳定地启动起来
 """
 
+import argparse
+import asyncio
 from pathlib import Path
 
 from app.clients.embedding_client_manager import embedding_client_manager
@@ -69,3 +71,23 @@ async def build(config_path: Path):
     await embedding_client_manager.close()
     await milvus_client_manager.close()
     await es_client_manager.close()
+
+
+def main():
+    """解析命令行参数并启动一次元数据知识库构建"""
+
+    parser = argparse.ArgumentParser(description="构建元数据知识库")
+    parser.add_argument(
+        "-c",
+        "--config",
+        required=True,
+        type=Path,
+        help="元数据配置文件路径，例如 conf/meta_config.yaml",
+    )
+    args = parser.parse_args()
+
+    asyncio.run(build(args.config))
+
+
+if __name__ == "__main__":
+    main()

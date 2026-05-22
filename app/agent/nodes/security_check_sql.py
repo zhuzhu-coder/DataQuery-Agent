@@ -9,6 +9,7 @@ from langgraph.runtime import Runtime
 
 from app.agent.context import DataQueryAgentContext
 from app.agent.state import DataQueryAgentState
+from app.agent.trace import emit_trace
 from app.conf.app_config import app_config
 from app.core.log import logger
 from app.services.sql_security_service import SQLSecurityError, SQLSecurityService
@@ -30,6 +31,12 @@ async def security_check_sql(
 
         if not app_config.sql_security.enabled:
             writer({"type": "progress", "step": step, "status": "success"})
+            emit_trace(
+                writer,
+                step=step,
+                title="安全检查已关闭",
+                summary="当前配置未启用 SQL 安全检查，SQL 将继续进入数据库校验。",
+            )
             return {"error": None, "error_type": None}
 
         service = SQLSecurityService(
@@ -44,12 +51,30 @@ async def security_check_sql(
 
         logger.info(f"安全检查后的SQL：{safe_sql}")
         writer({"type": "progress", "step": step, "status": "success"})
+        emit_trace(
+            writer,
+            step=step,
+            title="安全检查通过",
+            summary="仅 SELECT、表字段白名单和函数白名单通过，返回行数已受控。",
+            items=[{"label": "最终 SQL", "detail": safe_sql}],
+            metadata={
+                "max_rows": app_config.sql_security.max_rows,
+                "timeout_seconds": app_config.sql_security.timeout_seconds,
+            },
+        )
         return {"sql": safe_sql, "error": None, "error_type": None}
 
     except SQLSecurityError as e:
         message = str(e)
         logger.info(f"SQL安全检查失败：{message}")
         writer({"type": "progress", "step": step, "status": "error"})
+        emit_trace(
+            writer,
+            step=step,
+            title="安全检查未通过",
+            summary=message,
+            items=[{"label": "拒绝原因", "detail": message}],
+        )
         return {"error": message, "error_type": "security"}
 
     except Exception as e:

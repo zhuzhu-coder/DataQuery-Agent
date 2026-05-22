@@ -11,6 +11,7 @@ from langgraph.runtime import Runtime
 
 from app.agent.context import DataQueryAgentContext
 from app.agent.state import DataQueryAgentState, DateInfoState, DBInfoState
+from app.agent.trace import emit_trace
 from app.core.log import logger
 
 
@@ -37,6 +38,23 @@ async def add_extra_context(state: DataQueryAgentState, runtime: Runtime[DataQue
         logger.info(f"日期信息：{date_info}")
 
         writer({"type": "progress", "step": step, "status": "success"})
+        emit_trace(
+            writer,
+            step=step,
+            title="补齐日期和数据库环境",
+            summary="补充相对时间解析和 SQL 方言所需的运行环境信息。",
+            items=[
+                {
+                    "label": "当前日期",
+                    "detail": f"{date_info['date']}，{date_info['weekday']}，{date_info['quarter']}",
+                },
+                {
+                    "label": "数据库",
+                    "detail": f"{db_info['dialect']} {db_info['version']}",
+                },
+            ],
+            metadata={"date": date_info["date"], "dialect": db_info["dialect"]},
+        )
         return {"date_info": date_info, "db_info": db_info}
 
     except Exception as e:

@@ -23,7 +23,7 @@ export function EmptyState({ examples, children, onUseExample }: EmptyStateProps
             key={example}
             type="button"
             onClick={() => onUseExample(example)}
-            className="max-w-full rounded-2xl border border-slate-200 bg-white px-5 py-3 text-left text-[15px] leading-6 text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 sm:text-base"
+            className="max-w-full rounded-2xl border border-slate-200 bg-white px-5 py-3 text-left text-[15px] leading-6 text-slate-800 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-800 hover:shadow-lg hover:shadow-sky-100 focus:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-sky-100 focus:ring-offset-2 sm:text-base"
           >
             {example}
           </button>

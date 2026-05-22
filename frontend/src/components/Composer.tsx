@@ -43,7 +43,7 @@ export function Composer({
         <form
             onSubmit={submit}
             className={cn(
-                variant === "dock" && "border-t border-slate-100 bg-white px-4 py-4",
+                variant === "dock" && "border-t border-sky-50 bg-white px-4 py-4",
                 variant === "inline" && "w-full bg-transparent px-0 py-0",
             )}
         >
@@ -62,10 +62,10 @@ export function Composer({
                     onClick={isStreaming ? onStop : undefined}
                     disabled={!isStreaming && disabled}
                     className={cn(
-                        "grid h-11 w-11 shrink-0 place-items-center rounded-full text-white transition focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2",
+                        "grid h-11 w-11 shrink-0 place-items-center rounded-full text-white transition-all duration-150 hover:-translate-y-0.5 hover:shadow-lg focus:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-sky-100 focus:ring-offset-2 disabled:hover:translate-y-0 disabled:hover:shadow-none",
                         isStreaming
-                            ? "bg-rose-500 hover:bg-rose-600"
-                            : "bg-slate-900 hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300",
+                            ? "bg-rose-500 hover:bg-rose-600 hover:shadow-rose-100 focus:ring-rose-100"
+                            : "bg-sky-400 hover:bg-sky-500 hover:shadow-sky-100 disabled:cursor-not-allowed disabled:bg-sky-100",
                     )}
                     title={isStreaming ? "停止" : "发送"}
                     aria-label={isStreaming ? "停止" : "发送"}

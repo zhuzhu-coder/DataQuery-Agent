@@ -10,6 +10,7 @@ from langgraph.runtime import Runtime
 
 from app.agent.context import DataQueryAgentContext
 from app.agent.state import DataQueryAgentState
+from app.agent.trace import emit_trace
 from app.core.log import logger
 
 
@@ -43,10 +44,18 @@ async def extract_keywords(state: DataQueryAgentState, runtime: Runtime[DataQuer
         keywords: list[str] = jieba.analyse.extract_tags(query, allowPOS=allow_pos)
 
         # 保留原始问题作为兜底检索入口，避免关键词切分不准时丢掉完整语义
-        # set 用来去重；顺序不参与后续判断，所以这里不依赖关键词顺序
-        keywords = list(set(keywords + [query]))
+        # dict.fromkeys 用来去重并保留抽取顺序，便于前端轨迹稳定展示
+        keywords = list(dict.fromkeys(keywords + [query]))
 
         writer({"type": "progress", "step": step, "status": "success"})
+        emit_trace(
+            writer,
+            step=step,
+            title=f"抽取到 {len(keywords)} 个关键词",
+            summary="这些关键词会用于后续字段、指标和字段取值召回。",
+            items=[{"label": keyword} for keyword in keywords[:5]],
+            metadata={"keyword_count": len(keywords)},
+        )
         logger.info(f"抽取关键词成功: {keywords}")
         return {"keywords": keywords}
     except Exception as e:

@@ -15,6 +15,7 @@ from app.agent.state import (
     MetricInfoState,
     TableInfoState,
 )
+from app.agent.trace import emit_trace, table_trace_items
 from app.core.log import logger
 from app.entities.column_info import ColumnInfo
 from app.entities.metric_info import MetricInfo
@@ -153,6 +154,17 @@ async def merge_retrieved_info(
         )
 
         writer({"type": "progress", "step": step, "status": "success"})
+        emit_trace(
+            writer,
+            step=step,
+            title=f"合并出 {len(table_infos)} 张候选表、{len(metric_infos)} 个候选指标",
+            summary="补齐指标依赖字段、字段真实取值和主外键字段，形成 SQL 生成候选上下文。",
+            items=table_trace_items(table_infos),
+            metadata={
+                "table_count": len(table_infos),
+                "metric_count": len(metric_infos),
+            },
+        )
         return {
             "table_infos": table_infos,
             "metric_infos": metric_infos,

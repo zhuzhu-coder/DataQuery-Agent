@@ -33,7 +33,7 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
               <button
                 type="button"
                 onClick={copy}
-                className="shrink-0 rounded-full p-1.5 text-slate-400 opacity-0 outline-none transition hover:bg-slate-100 hover:text-slate-700 focus:opacity-100 focus:ring-2 focus:ring-slate-300 group-hover:opacity-100"
+                className="shrink-0 rounded-full p-1.5 text-sky-500 opacity-0 outline-none transition-all duration-150 hover:-translate-y-0.5 hover:bg-sky-50 hover:text-sky-700 hover:shadow-md hover:shadow-sky-100 focus:-translate-y-0.5 focus:opacity-100 focus:ring-4 focus:ring-sky-100 group-hover:opacity-100"
                 title="复制"
                 aria-label="复制"
               >
@@ -48,7 +48,7 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
             </div>
           )}
 
-          {!isUser && <StepRail steps={message.steps} />}
+          {!isUser && <StepRail steps={message.steps} traces={message.traces} />}
           {!isUser && message.result !== undefined && <ResultTable data={message.result} />}
 
           <div

@@ -55,6 +55,10 @@ class SecurityCheckSQLNodeTest(unittest.TestCase):
         self.assertIsNone(result["error"])
         self.assertTrue(result["sql"].endswith("LIMIT 200"))
         self.assertEqual(runtime.context["query_audit_repository"].final_sql, result["sql"])
+        traces = [event for event in runtime.events if event["type"] == "trace"]
+        self.assertEqual(traces[-1]["step"], "安全检查SQL")
+        self.assertEqual(traces[-1]["title"], "安全检查通过")
+        self.assertEqual(traces[-1]["metadata"]["max_rows"], 200)
 
     def test_security_check_rejects_unsafe_sql_and_finishes_audit(self):
         runtime = FakeRuntime()
@@ -69,6 +73,9 @@ class SecurityCheckSQLNodeTest(unittest.TestCase):
         self.assertEqual(result["error_type"], "security")
         self.assertIn("SELECT", result["error"])
         self.assertIsNone(runtime.context["query_audit_repository"].status)
+        traces = [event for event in runtime.events if event["type"] == "trace"]
+        self.assertEqual(traces[-1]["title"], "安全检查未通过")
+        self.assertIn("SELECT", traces[-1]["summary"])
 
         asyncio.run(fail_query({**state, **result}, runtime))
 

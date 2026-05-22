@@ -2,9 +2,11 @@
  * 智能体执行流程图组件
  * 按 LangGraph 节点拓扑展示各步骤状态
  */
+import { useEffect, useMemo, useState } from "react";
 import { Check, Circle, LoaderCircle, X } from "lucide-react";
 import { cn } from "../lib/format";
-import type { StepState, StepStatus } from "../types/agent";
+import type { StepState, StepStatus, TraceState } from "../types/agent";
+import { TraceDetailContent } from "./TraceTimeline";
 
 type FlowStatus = StepStatus | "pending";
 
@@ -13,6 +15,13 @@ type FlowNode = {
   x: number;
   y: number;
   w?: number;
+};
+
+type BranchLabel = {
+  text: string;
+  x: number;
+  y: number;
+  anchor?: "start" | "middle";
 };
 
 const nodes: FlowNode[] = [
@@ -26,7 +35,7 @@ const nodes: FlowNode[] = [
   { step: "添加额外上下文", x: 430, y: 422, w: 176 },
   { step: "生成SQL", x: 430, y: 526 },
   { step: "安全检查SQL", x: 430, y: 630, w: 176 },
-  { step: "查询终止", x: 130, y: 734 },
+  { step: "查询终止", x: 160, y: 734 },
   { step: "校验SQL", x: 430, y: 734 },
   { step: "校正SQL", x: 700, y: 734 },
   { step: "执行SQL", x: 430, y: 838 },
@@ -45,21 +54,21 @@ const connectors = [
   "M550 358 L550 386 L430 386 L430 416",
   "M430 462 L430 520",
   "M430 566 L430 624",
-  "M342 650 L130 650 L130 728",
+  "M336 650 L160 650 L160 728",
   "M430 670 L430 728",
-  "M352 754 L214 754",
+  "M352 754 L244 754",
   "M430 774 L430 832",
   "M508 754 L616 754",
   "M700 734 L700 650 L524 650",
 ];
 
-const branchLabels = [
-  { text: "安全未通过", x: 203, y: 642 },
-  { text: "安全通过", x: 450, y: 704 },
-  { text: "复检仍失败", x: 250, y: 746 },
-  { text: "校验未通过", x: 529, y: 746 },
-  { text: "校验通过", x: 450, y: 808 },
-  { text: "修正后复检", x: 580, y: 642 },
+const branchLabels: BranchLabel[] = [
+  { text: "安全未通过", x: 248, y: 642 },
+  { text: "安全通过", x: 450, y: 704, anchor: "start" },
+  { text: "复检仍失败", x: 298, y: 746 },
+  { text: "校验未通过", x: 562, y: 746 },
+  { text: "校验通过", x: 450, y: 808, anchor: "start" },
+  { text: "修正后复检", x: 612, y: 642 },
 ];
 
 function getStatusMap(steps: StepState[]) {
@@ -71,6 +80,13 @@ function getStatusMap(steps: StepState[]) {
 
 function statusFor(step: string, map: Record<string, StepState>): FlowStatus {
   return map[step]?.status ?? "pending";
+}
+
+function groupTracesByStep(traces: TraceState[] = []) {
+  return traces.reduce<Record<string, TraceState[]>>((map, trace) => {
+    map[trace.step] = [...(map[trace.step] ?? []), trace];
+    return map;
+  }, {});
 }
 
 function NodeIcon({ status }: { status: FlowStatus }) {
@@ -89,22 +105,39 @@ function NodeIcon({ status }: { status: FlowStatus }) {
   return <Circle className="h-3.5 w-3.5" aria-hidden="true" />;
 }
 
-function FlowNodeCard({ node, status }: { node: FlowNode; status: FlowStatus }) {
+function FlowNodeCard({
+  node,
+  status,
+  traceCount,
+  onOpen,
+}: {
+  node: FlowNode;
+  status: FlowStatus;
+  traceCount: number;
+  onOpen: () => void;
+}) {
   const width = node.w ?? 156;
+  const hasTrace = traceCount > 0;
 
   return (
     <div
       className="absolute -translate-x-1/2"
       style={{ left: node.x, top: node.y, width }}
     >
-      <div
+      <button
+        type="button"
+        disabled={!hasTrace}
+        onClick={onOpen}
+        title={hasTrace ? `查看 ${node.step} 的执行轨迹` : `${node.step} 暂无执行轨迹`}
         className={cn(
-          "flex h-10 items-center gap-2 rounded-2xl border px-3 text-sm font-semibold shadow-sm transition",
+          "group relative flex h-10 w-full items-center gap-2 rounded-2xl border px-3 text-left text-sm font-semibold shadow-sm transition-all duration-150 focus:outline-none",
           status === "pending" && "border-slate-200 bg-white text-slate-400",
           status === "stopped" && "border-slate-200 bg-slate-50 text-slate-500",
           status === "running" && "border-amber-200 bg-amber-50 text-amber-800",
           status === "success" && "border-emerald-200 bg-emerald-50 text-emerald-800",
           status === "error" && "border-rose-200 bg-rose-50 text-rose-600",
+          hasTrace && "cursor-pointer hover:-translate-y-0.5 hover:border-sky-400 hover:shadow-lg hover:shadow-sky-100 focus:-translate-y-0.5 focus:border-sky-400 focus:ring-4 focus:ring-sky-100",
+          !hasTrace && "cursor-default",
         )}
       >
         <span
@@ -120,21 +153,89 @@ function FlowNodeCard({ node, status }: { node: FlowNode; status: FlowStatus }) 
           <NodeIcon status={status} />
         </span>
         <span className="min-w-0 flex-1 truncate">{node.step}</span>
+        {hasTrace && (
+          <span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-sky-400 px-1 text-[11px] font-semibold text-white shadow-sm ring-2 ring-white transition group-hover:bg-sky-500">
+            {traceCount}
+          </span>
+        )}
+      </button>
+    </div>
+  );
+}
+
+function TraceDialog({
+  step,
+  traces,
+  onClose,
+}: {
+  step: string;
+  traces: TraceState[];
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+      <button
+        type="button"
+        className="absolute inset-0 bg-slate-900/25"
+        aria-label="关闭执行轨迹弹窗"
+        onClick={onClose}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${step}执行轨迹`}
+        className="relative z-10 flex max-h-[82vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+      >
+        <header className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+          <div>
+            <div className="text-sm font-semibold text-slate-900">{step}</div>
+            <div className="mt-1 text-xs text-slate-400">执行轨迹结果</div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-9 w-9 place-items-center rounded-full text-sky-500 transition-all duration-150 hover:-translate-y-0.5 hover:bg-sky-50 hover:text-sky-700 hover:shadow-md hover:shadow-sky-100 focus:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-sky-100"
+            title="关闭"
+            aria-label="关闭"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </header>
+        <div className="overflow-y-auto bg-slate-50/60 p-5">
+          <TraceDetailContent traces={traces} />
+        </div>
       </div>
     </div>
   );
 }
 
-export function StepRail({ steps = [] }: { steps?: StepState[] }) {
-  if (steps.length === 0) return null;
-
+export function StepRail({
+  steps = [],
+  traces = [],
+}: {
+  steps?: StepState[];
+  traces?: TraceState[];
+}) {
   const statusMap = getStatusMap(steps);
+  const tracesByStep = useMemo(() => groupTracesByStep(traces), [traces]);
+  const [selectedStep, setSelectedStep] = useState<string | null>(null);
+  const selectedTraces = selectedStep ? tracesByStep[selectedStep] ?? [] : [];
+
+  if (steps.length === 0) return null;
 
   return (
     <section className="mt-4 rounded-3xl border border-slate-200 bg-slate-50/70 px-3 py-4">
       <div className="mb-3 flex items-center justify-between gap-3 px-1">
         <div className="text-sm font-semibold text-slate-900">执行流程</div>
-        <div className="text-xs text-slate-400">LangGraph</div>
       </div>
 
       <div className="overflow-x-auto">
@@ -174,6 +275,7 @@ export function StepRail({ steps = [] }: { steps?: StepState[] }) {
                 fill="rgba(71, 85, 105, 0.72)"
                 fontSize="13"
                 fontWeight="600"
+                textAnchor={label.anchor ?? "middle"}
               >
                 {label.text}
               </text>
@@ -185,10 +287,20 @@ export function StepRail({ steps = [] }: { steps?: StepState[] }) {
               key={node.step}
               node={node}
               status={statusFor(node.step, statusMap)}
+              traceCount={tracesByStep[node.step]?.length ?? 0}
+              onOpen={() => setSelectedStep(node.step)}
             />
           ))}
         </div>
       </div>
+
+      {selectedStep && (
+        <TraceDialog
+          step={selectedStep}
+          traces={selectedTraces}
+          onClose={() => setSelectedStep(null)}
+        />
+      )}
     </section>
   );
 }

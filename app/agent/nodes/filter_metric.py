@@ -13,6 +13,7 @@ from langgraph.runtime import Runtime
 from app.agent.context import DataQueryAgentContext
 from app.agent.llm import llm
 from app.agent.state import DataQueryAgentState, MetricInfoState
+from app.agent.trace import emit_trace, metric_trace_items
 from app.core.log import logger
 from app.prompt.prompt_loader import load_prompt
 
@@ -56,6 +57,14 @@ async def filter_metric(state: DataQueryAgentState, runtime: Runtime[DataQueryAg
         )
 
         writer({"type": "progress", "step": step, "status": "success"})
+        emit_trace(
+            writer,
+            step=step,
+            title=f"保留 {len(filtered_metric_infos)} 个指标",
+            summary="从候选指标中保留与用户问题匹配的业务口径。",
+            items=metric_trace_items(filtered_metric_infos),
+            metadata={"metric_count": len(filtered_metric_infos)},
+        )
         return {"metric_infos": filtered_metric_infos}
 
     except Exception as e:

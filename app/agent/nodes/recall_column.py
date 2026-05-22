@@ -13,6 +13,7 @@ from langgraph.runtime import Runtime
 from app.agent.context import DataQueryAgentContext
 from app.agent.llm import llm
 from app.agent.state import DataQueryAgentState
+from app.agent.trace import column_trace_items, emit_trace
 from app.core.log import logger
 from app.entities.column_info import ColumnInfo
 from app.prompt.prompt_loader import load_prompt
@@ -73,6 +74,14 @@ async def recall_column(state: DataQueryAgentState, runtime: Runtime[DataQueryAg
         retrieved_column_infos: list[ColumnInfo] = list(column_info_map.values())
 
         writer({"type": "progress", "step": step, "status": "success"})
+        emit_trace(
+            writer,
+            step=step,
+            title=f"命中 {len(retrieved_column_infos)} 个相关字段",
+            summary="围绕用户问题召回候选字段上下文。",
+            items=column_trace_items(retrieved_column_infos),
+            metadata={"column_count": len(retrieved_column_infos)},
+        )
         return {"retrieved_column_infos": retrieved_column_infos} # 返回召回的字段信息列表
     except Exception as e:
         logger.error(f"{step} failed: {e}")

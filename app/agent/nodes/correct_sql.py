@@ -13,6 +13,7 @@ from langgraph.runtime import Runtime
 from app.agent.context import DataQueryAgentContext
 from app.agent.llm import llm
 from app.agent.state import DataQueryAgentState
+from app.agent.trace import emit_trace
 from app.core.log import logger
 from app.prompt.prompt_loader import load_prompt
 
@@ -75,11 +76,24 @@ async def correct_sql(state: DataQueryAgentState, runtime: Runtime[DataQueryAgen
 
         logger.info(f"校正后的SQL：{result}")
         writer({"type": "progress", "step": step, "status": "success"})
+        correction_attempts = state.get("correction_attempts", 0) + 1
+        emit_trace(
+            writer,
+            step=step,
+            title=f"完成第 {correction_attempts} 次 SQL 修正",
+            summary="根据数据库错误和上下文重写候选 SQL，修正后会重新经过安全检查。",
+            items=[
+                {"label": "原始错误", "detail": str(error)},
+                {"label": "修正前 SQL", "detail": sql},
+                {"label": "修正后 SQL", "detail": result},
+            ],
+            metadata={"correction_attempts": correction_attempts},
+        )
         return {
             "sql": result,
             "error": None,
             "error_type": None,
-            "correction_attempts": state.get("correction_attempts", 0) + 1,
+            "correction_attempts": correction_attempts,
         }
     except Exception as e:
         logger.error(f"{step} failed: {e}")

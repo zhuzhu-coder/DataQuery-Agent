@@ -13,6 +13,7 @@ from langgraph.runtime import Runtime
 from app.agent.context import DataQueryAgentContext
 from app.agent.llm import llm
 from app.agent.state import DataQueryAgentState
+from app.agent.trace import emit_trace
 from app.core.log import logger
 from app.prompt.prompt_loader import load_prompt
 
@@ -72,6 +73,17 @@ async def generate_sql(state: DataQueryAgentState, runtime: Runtime[DataQueryAge
                 generated_sql=result,
             )
         writer({"type": "progress", "step": step, "status": "success"})
+        emit_trace(
+            writer,
+            step=step,
+            title="生成候选 SQL",
+            summary="基于筛选后的表结构、指标口径、日期和数据库环境生成查询语句。",
+            items=[{"label": "SQL", "detail": result}],
+            metadata={
+                "table_count": len(table_infos),
+                "metric_count": len(metric_infos),
+            },
+        )
         return {"sql": result}
 
     except Exception as e:

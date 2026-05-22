@@ -17,13 +17,13 @@ import { EmptyState } from "./components/EmptyState";
 import { MessageBubble } from "./components/MessageBubble";
 import { streamQuery } from "./lib/agentApi";
 import { cn, summarizeResult } from "./lib/format";
-import type { AgentEvent, ChatMessage, StepState } from "./types/agent";
+import type { AgentEvent, ChatMessage, StepState, TraceState } from "./types/agent";
 
 const examples = [
-  "统计 2025 年第一季度各大区的 GMV，并按 GMV 从高到低排序",
-  "统计 2025 年 3 月各商品品类的销量和销售额",
-  "查询华东地区 2025 年第一季度销售额最高的前 5 个商品",
-  "按会员等级统计 2025 年第一季度的订单数和销售额",
+  "统计 2026 年第一季度各大区的 GMV，并按 GMV 从高到低排序",
+  "统计 2026 年 3 月各商品品类的销量和销售额",
+  "查询华东地区 2026 年第一季度销售额最高的前 5 个商品",
+  "按会员等级统计 2026 年第一季度的订单数和销售额",
 ];
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "Vite /api proxy";
@@ -54,6 +54,10 @@ function markQueryFailed(steps: StepState[] = []) {
     step: "查询终止",
     status: "error",
   });
+}
+
+function appendTrace(traces: TraceState[] = [], event: Extract<AgentEvent, { type: "trace" }>) {
+  return [...traces, { ...event, updatedAt: Date.now() }];
 }
 
 export default function App() {
@@ -97,6 +101,7 @@ export default function App() {
       createdAt: Date.now(),
       status: "streaming",
       steps: [],
+      traces: [],
     };
 
     const controller = new AbortController();
@@ -114,6 +119,13 @@ export default function App() {
               ...message,
               content: event.status === "running" ? `正在执行：${event.step}` : message.content,
               steps: upsertStep(message.steps, event),
+            };
+          }
+
+          if (event.type === "trace") {
+            return {
+              ...message,
+              traces: appendTrace(message.traces, event),
             };
           }
 
@@ -185,17 +197,17 @@ export default function App() {
         )}
       >
         <aside className="hidden min-h-0 border-r border-slate-200 bg-slate-50/95 lg:flex lg:flex-col">
-          <div className={cn("border-b border-slate-200", isSidebarOpen ? "px-5 py-4" : "px-3 py-3")}>
-            <div className={cn("flex items-center", isSidebarOpen ? "justify-between gap-3" : "justify-center")}>
+          <div className={cn("h-16 border-b border-slate-200", isSidebarOpen ? "px-5" : "px-3")}>
+            <div className={cn("flex h-full items-center", isSidebarOpen ? "justify-between gap-3" : "justify-center")}>
               {isSidebarOpen && (
                 <div className="min-w-0">
-                  <div className="truncate text-base font-semibold">Data Query Agent</div>
+                  <div className="truncate text-base font-semibold text-sky-600">Data Query Agent</div>
                 </div>
               )}
               <button
                 type="button"
                 onClick={() => setIsSidebarOpen((value) => !value)}
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-sky-600 transition-all duration-150 hover:-translate-y-0.5 hover:bg-sky-50 hover:text-sky-700 hover:shadow-lg hover:shadow-sky-100 focus:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-sky-100"
                 title={isSidebarOpen ? "收起边栏" : "展开边栏"}
                 aria-label={isSidebarOpen ? "收起边栏" : "展开边栏"}
               >
@@ -214,7 +226,7 @@ export default function App() {
                 type="button"
                 onClick={clearConversation}
                 disabled={isStreaming}
-                className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-900 text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="grid h-11 w-11 place-items-center rounded-2xl border border-sky-200 bg-sky-50 text-sky-600 transition-all duration-150 hover:-translate-y-0.5 hover:border-sky-300 hover:bg-sky-100 hover:shadow-lg hover:shadow-sky-100 focus:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:hover:translate-y-0 disabled:hover:shadow-none"
                 title="新会话"
                 aria-label="新会话"
               >
@@ -228,14 +240,14 @@ export default function App() {
                   type="button"
                   onClick={clearConversation}
                   disabled={isStreaming}
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 text-sm font-semibold text-sky-600 transition-all duration-150 hover:-translate-y-0.5 hover:border-sky-300 hover:bg-sky-100 hover:shadow-lg hover:shadow-sky-100 focus:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:hover:translate-y-0 disabled:hover:shadow-none"
                 >
                   <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />
                   新会话
                 </button>
 
                 <section>
-                  <div className="mb-2 flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  <div className="mb-2 flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-[0.14em] text-sky-600">
                     <History className="h-3.5 w-3.5" aria-hidden="true" />
                     样例
                   </div>
@@ -246,7 +258,7 @@ export default function App() {
                         type="button"
                         disabled={isStreaming}
                         onClick={() => startQuery(example)}
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-left text-sm leading-5 text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-55"
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-left text-sm leading-5 text-slate-700 transition-all duration-150 hover:-translate-y-0.5 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-800 hover:shadow-lg hover:shadow-sky-100 focus:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:translate-y-0 disabled:hover:shadow-none"
                       >
                         {example}
                       </button>
@@ -259,14 +271,14 @@ export default function App() {
                 <div className="grid gap-2 text-xs text-slate-500">
                   <div className="flex items-center justify-between gap-3">
                     <span className="inline-flex items-center gap-2">
-                      <Server className="h-3.5 w-3.5" aria-hidden="true" />
+                      <Server className="h-3.5 w-3.5 text-sky-600" aria-hidden="true" />
                       API
                     </span>
                     <span className="truncate font-mono">{API_BASE_URL}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="inline-flex items-center gap-2">
-                      <Activity className="h-3.5 w-3.5" aria-hidden="true" />
+                      <Activity className="h-3.5 w-3.5 text-sky-600" aria-hidden="true" />
                       完成
                     </span>
                     <span>{completedCount}</span>
@@ -284,7 +296,7 @@ export default function App() {
               onClick={clearConversation}
               disabled={isStreaming}
               className={cn(
-                "inline-flex h-10 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-45",
+                "inline-flex h-10 items-center gap-2 rounded-full border border-sky-100 bg-sky-50 px-4 text-sm font-medium text-sky-600 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-sky-300 hover:bg-sky-100 hover:text-sky-700 hover:shadow-lg hover:shadow-sky-100 focus:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 disabled:hover:shadow-none",
               )}
               title="清空"
               aria-label="清空"
