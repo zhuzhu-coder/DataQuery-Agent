@@ -15,7 +15,7 @@ from langgraph.runtime import Runtime
 from app.agent.context import DataQueryAgentContext
 from app.agent.llm import llm
 from app.agent.observations import observation_update
-from app.agent.state import DataQueryAgentState, EvaluationResultState
+from app.agent.state import DataQueryAgentState, EvaluationResultState, current_query
 from app.agent.trace import emit_trace
 from app.core.log import logger
 from app.prompt.prompt_loader import load_prompt
@@ -115,7 +115,7 @@ async def _evaluate_with_llm(payload: dict[str, Any]) -> dict:
 def _build_prompt_payload(state: DataQueryAgentState) -> dict[str, Any]:
     """构建评估 SQL 答案的 Prompt 输入"""
     return {
-        "query": state["query"],
+        "query": current_query(state),
         "sql": state["sql"],
         "agent_plan": yaml.dump(
             state.get("agent_plan") or {}, allow_unicode=True, sort_keys=False

@@ -13,3 +13,5 @@ class QuerySchema(BaseModel):
 
     # 前端请求体中的 query 字段，例如 {"query": "统计华北地区销售额"}
     query: str
+    # 前端会话 ID；相同 ID 下后端会维护最近几轮问数摘要
+    conversation_id: str | None = None

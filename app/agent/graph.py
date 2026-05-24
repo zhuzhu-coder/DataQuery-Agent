@@ -22,12 +22,21 @@ from app.agent.nodes.general_answer import general_answer
 from app.agent.nodes.generate_sql import generate_sql
 from app.agent.nodes.merge_retrieved_info import merge_retrieved_info
 from app.agent.nodes.plan_query import plan_query
+from app.agent.nodes.resolve_conversation_context import resolve_conversation_context
 from app.agent.nodes.route_user_intent import route_user_intent
 from app.agent.nodes.run_sql import run_sql
 from app.agent.nodes.security_check_sql import security_check_sql
 from app.agent.nodes.tool_executor import tool_executor
 from app.agent.nodes.validate_sql import validate_sql
 from app.agent.state import DataQueryAgentState
+
+
+def route_conversation_entry(state: DataQueryAgentState) -> str:
+    """第一轮直接识别意图，有历史时先做上下文补全"""
+
+    if state.get("conversation_history"):
+        return "resolve_conversation_context"
+    return "route_user_intent"
 
 
 def route_sql_evaluation(state: DataQueryAgentState) -> str:
@@ -54,6 +63,7 @@ graph_builder = StateGraph(
 
 # 注册节点：每个节点负责问数链路中的一个清晰步骤
 graph_builder.add_node("route_user_intent", route_user_intent) # 意图安全检查和话题路由
+graph_builder.add_node("resolve_conversation_context", resolve_conversation_context) # 多轮上下文补全
 graph_builder.add_node("general_answer", general_answer) # 普通回答
 graph_builder.add_node("plan_query", plan_query) # 制定查询计划
 graph_builder.add_node("ask_clarification", ask_clarification) # 澄清查询口径
@@ -71,8 +81,16 @@ graph_builder.add_node("correct_sql", correct_sql) # 修正 SQL
 graph_builder.add_node("run_sql", run_sql) # 执行 SQL
 graph_builder.add_node("fail_query", fail_query) # 失败终止
 
-# 从用户问题开始，先做意图安全检查和话题路由
-graph_builder.add_edge(START, "route_user_intent")
+# 从用户问题开始：第一轮直接识别意图；有会话历史时先补全省略式追问
+graph_builder.add_conditional_edges(
+    source=START,
+    path=route_conversation_entry,
+    path_map={
+        "resolve_conversation_context": "resolve_conversation_context",
+        "route_user_intent": "route_user_intent",
+    },
+)
+graph_builder.add_edge("resolve_conversation_context", "route_user_intent")
 
 graph_builder.add_conditional_edges(
     source="route_user_intent",

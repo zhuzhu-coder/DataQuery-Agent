@@ -10,7 +10,7 @@ from langgraph.runtime import Runtime
 
 from app.agent.context import DataQueryAgentContext
 from app.agent.llm import llm
-from app.agent.state import DataQueryAgentState
+from app.agent.state import DataQueryAgentState, current_query
 from app.agent.trace import emit_trace
 from app.core.log import logger
 from app.prompt.prompt_loader import load_prompt
@@ -26,7 +26,7 @@ async def general_answer(
     writer({"type": "progress", "step": step, "status": "running"})
 
     try:
-        query = state["query"]
+        query = current_query(state)
         answer = await _answer_with_llm(query)
 
         writer({"type": "progress", "step": step, "status": "success"})

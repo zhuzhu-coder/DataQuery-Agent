@@ -14,8 +14,9 @@ from app.agent.state import (
     AgentObservationState,
     DataQueryAgentState,
     ToolCallState,
+    current_query,
 )
-from app.agent.tools import available_tool_names, build_agent_tools
+from app.agent.tools import build_agent_tools, normalize_tool_calls
 from app.agent.trace import (
     column_trace_items,
     emit_trace,
@@ -63,7 +64,9 @@ async def tool_executor(
 
     try:
         tools = build_agent_tools(runtime.context)
-        tool_calls = _tool_calls_from_state(state)
+        tool_calls = normalize_tool_calls(
+            (state.get("agent_plan") or {}).get("tool_calls")
+        )
 
         updates: dict[str, Any] = {
             "retrieved_column_infos": [],
@@ -81,7 +84,7 @@ async def tool_executor(
 
             result = await tool.ainvoke(
                 {
-                    "query": state["query"],
+                    "query": current_query(state),
                     "keywords": state.get("keywords", []),
                     "hints": _hints_from_tool_call(tool_call),
                 }
@@ -132,61 +135,11 @@ async def tool_executor(
         writer({"type": "progress", "step": step, "status": "error"})
         raise
 
-
-def _tool_calls_from_state(state: DataQueryAgentState) -> list[ToolCallState]:
-    """读取并校验 Planner 工具调用计划，非法或为空时回退三路召回"""
-
-    raw_tool_calls = (state.get("agent_plan") or {}).get("tool_calls")
-    if not isinstance(raw_tool_calls, list):
-        return _fallback_tool_calls()
-
-    allowed_tool_names = set(available_tool_names())
-    tool_calls: list[ToolCallState] = []
-    seen_tool_names: set[str] = set()
-    for item in raw_tool_calls:
-        if not isinstance(item, dict):
-            continue
-        tool_name = str(item.get("name") or "")
-        if tool_name not in allowed_tool_names or tool_name in seen_tool_names:
-            continue
-        seen_tool_names.add(tool_name)
-        args = item.get("args") if isinstance(item.get("args"), dict) else {}
-        tool_calls.append(
-            ToolCallState(
-                id=str(item.get("id") or f"tool_{len(tool_calls) + 1}"),
-                name=tool_name,
-                args={"hints": _string_list(args.get("hints"))},
-                reason=str(item.get("reason") or ""),
-            )
-        )
-
-    return tool_calls or _fallback_tool_calls()
-
-
-def _fallback_tool_calls() -> list[ToolCallState]:
-    """工具调用兜底"""
-    return [
-        ToolCallState(
-            id=f"tool_{index}",
-            name=tool_name,
-            args={"hints": []},
-            reason="Planner 未给出有效工具调用，使用三路召回兜底。",
-        )
-        for index, tool_name in enumerate(available_tool_names(), start=1)
-    ]
-
-
 def _hints_from_tool_call(tool_call: ToolCallState) -> list[str]:
     """从工具调用中提取提示词"""
     args = tool_call.get("args") or {}
-    return _string_list(args.get("hints"))
-
-
-def _string_list(value: object) -> list[str]:
-    """将对象转换为字符串列表"""
-    if not isinstance(value, list):
-        return []
-    return [str(item) for item in value if item is not None]
+    hints = args.get("hints")
+    return list(hints) if isinstance(hints, list) else []
 
 
 def _merge_by_id(existing: list[Any], incoming: list[Any]) -> list[Any]:

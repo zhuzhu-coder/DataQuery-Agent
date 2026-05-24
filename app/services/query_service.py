@@ -7,6 +7,7 @@
 """
 
 import json
+from typing import Any
 
 from app.agent.context import DataQueryAgentContext
 from app.agent.graph import graph
@@ -19,6 +20,7 @@ from app.repositories.mysql.meta.meta_mysql_repository import MetaMySQLRepositor
 from app.repositories.mysql.meta.query_audit_repository import QueryAuditRepository
 from app.repositories.vector.column_vector_repository import ColumnVectorRepository
 from app.repositories.vector.metric_vector_repository import MetricVectorRepository
+from app.services.conversation_memory import ConversationMemoryStore
 
 
 class QueryService:
@@ -33,6 +35,7 @@ class QueryService:
         metric_vector_repository: MetricVectorRepository, # 指标向量仓储
         value_es_repository: ValueESRepository, # 字段取值全文检索仓储
         query_audit_repository: QueryAuditRepository, # 查询审计仓储
+        conversation_memory_store: ConversationMemoryStore | None = None, # 会话级短期记忆
     ):
         # MySQL 仓储分别负责元数据补全和真实数仓环境信息读取
         self.meta_mysql_repository = meta_mysql_repository
@@ -44,17 +47,22 @@ class QueryService:
         self.metric_vector_repository = metric_vector_repository
         self.value_es_repository = value_es_repository
         self.query_audit_repository = query_audit_repository
+        self.conversation_memory_store = conversation_memory_store
 
-    async def query(self, query: str):
+    async def query(self, query: str, conversation_id: str | None = None):
         """执行一次问数工作流，并逐段产出 SSE 消息"""
         # 创建查询审计记录
         audit_id = await self.query_audit_repository.create_started(
             request_id=request_id_ctx_var.get(),
             query=query,
         )
+        # 读取会话历史摘要
+        conversation_history = self._conversation_history(conversation_id)
         # State 只放会被图节点读写和合并的业务数据，外部工具对象不塞进 State
         state = DataQueryAgentState(
             query=query,
+            conversation_history=conversation_history,
+            resolved_query="",
             audit_id=audit_id,
             correction_attempts=0,
             agent_plan={},
@@ -72,14 +80,31 @@ class QueryService:
             dw_mysql_repository=self.dw_mysql_repository,
             query_audit_repository=self.query_audit_repository,
         )
+        resolved_query = query
+        final_summary = ""
         try:
             # stream_mode="custom" 对应节点内部 writer(...) 写出的进度消息
             async for chunk in graph.astream(
                 input=state, context=context, stream_mode="custom"
             ):
+                if isinstance(chunk, dict):
+                    event_type = chunk.get("type")
+                    if event_type == "trace" and chunk.get("step") == "上下文补全":
+                        resolved_query = (
+                            _resolved_query_from_event(chunk) or resolved_query
+                        )
+                    elif event_type in {"result", "answer"}:
+                        final_summary = _memory_summary_from_event(chunk)
                 # SSE 要求每条消息以 data: 开头，并以两个换行符结束
                 # ensure_ascii=False 中文字符不转义，default=str 兜底处理日期等非 JSON 类型
                 yield f"data: {json.dumps(chunk, ensure_ascii=False, default=str)}\n\n"
+            if final_summary:
+                self._append_memory(
+                    conversation_id=conversation_id,
+                    query=query,
+                    resolved_query=resolved_query,
+                    summary=final_summary,
+                )
         except Exception as e:
             await self.query_audit_repository.finish(
                 audit_id,
@@ -89,3 +114,88 @@ class QueryService:
             # 流式接口已经开始返回后不能再改 HTTP 状态码，因此把异常也包装成一条 SSE 消息
             error = {"type": "error", "message": str(e)}
             yield f"data: {json.dumps(error, ensure_ascii=False, default=str)}\n\n"
+
+    def _conversation_history(self, conversation_id: str | None) -> list[dict[str, Any]]:
+        """读取会话历史并转换为 State 可序列化结构"""
+
+        if not conversation_id or not self.conversation_memory_store:
+            return []
+        history = []
+        for turn in self.conversation_memory_store.get_history(conversation_id):
+            history.append(
+                {
+                    "role": turn.role,
+                    "content": turn.content,
+                    "summary": turn.summary,
+                }
+            )
+        return history
+
+    def _append_memory(
+        self,
+        conversation_id: str | None,
+        query: str,
+        resolved_query: str,
+        summary: str,
+    ) -> None:
+        """将本轮成功响应写入会话短期记忆"""
+
+        if not conversation_id or not self.conversation_memory_store:
+            return
+        user_summary = (
+            f"补全问题：{resolved_query}" if resolved_query != query else "独立问题"
+        )
+        self.conversation_memory_store.append_turn(
+            conversation_id,
+            role="user",
+            content=query,
+            summary=user_summary,
+        )
+        self.conversation_memory_store.append_turn(
+            conversation_id,
+            role="assistant",
+            content="查询完成",
+            summary=summary,
+        )
+
+
+def _resolved_query_from_event(event: Any) -> str | None:
+    """从事件中提取补全后的查询语句"""
+    if not isinstance(event, dict):
+        return None
+    if event.get("type") != "trace" or event.get("step") != "上下文补全":
+        return None
+    metadata = event.get("metadata") or {}
+    resolved_query = metadata.get("resolved_query")
+    return str(resolved_query) if resolved_query else None
+
+
+def _memory_summary_from_event(event: Any) -> str:
+    """从事件中提取查询结果摘要"""
+    if not isinstance(event, dict):
+        return ""
+    event_type = event.get("type")
+    if event_type == "result":
+        return _summarize_result(event.get("data"))
+    if event_type == "answer":
+        content = str(event.get("content") or "")
+        return content[:200]
+    return ""
+
+
+def _summarize_result(data: Any) -> str:
+    if isinstance(data, list):
+        row_count = len([row for row in data if isinstance(row, dict)])
+        columns: list[str] = []
+        for row in data:
+            if not isinstance(row, dict):
+                continue
+            for column in row.keys():
+                if str(column) not in columns:
+                    columns.append(str(column))
+        if columns:
+            return f"返回 {row_count} 行，字段：{', '.join(columns[:8])}"
+        return f"返回 {row_count} 行"
+    if isinstance(data, dict):
+        return f"返回 1 行，字段：{', '.join(str(key) for key in list(data.keys())[:8])}"
+    return "查询完成"

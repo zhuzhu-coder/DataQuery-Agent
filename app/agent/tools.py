@@ -11,6 +11,7 @@ from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
 from app.agent.context import DataQueryAgentContext
+from app.agent.state import ToolCallState
 from app.agent.toolkits.recall import (
     RecallToolResult,
     run_recall_column,
@@ -72,6 +73,49 @@ def available_tool_names() -> list[str]:
     return [tool["name"] for tool in AVAILABLE_TOOLS]
 
 
+def normalize_tool_calls(value: object) -> list[ToolCallState]:
+    """规范化工具调用计划，非法或为空时回退到全部工具"""
+
+    if not isinstance(value, list):
+        return default_tool_calls()
+
+    allowed_tool_names = set(available_tool_names())
+    tool_calls: list[ToolCallState] = []
+    seen_tool_names: set[str] = set()
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        tool_name = str(item.get("name") or "")
+        if tool_name not in allowed_tool_names or tool_name in seen_tool_names:
+            continue
+        seen_tool_names.add(tool_name)
+        args = item.get("args") if isinstance(item.get("args"), dict) else {}
+        tool_calls.append(
+            ToolCallState(
+                id=str(item.get("id") or f"tool_{len(tool_calls) + 1}"),
+                name=tool_name,
+                args={"hints": _string_list(args.get("hints"))},
+                reason=str(item.get("reason") or ""),
+            )
+        )
+
+    return tool_calls or default_tool_calls()
+
+
+def default_tool_calls() -> list[ToolCallState]:
+    """Planner 输出不可用时，保守调用全部注册工具"""
+
+    return [
+        ToolCallState(
+            id=f"tool_{index}",
+            name=tool_name,
+            args={"hints": []},
+            reason="Planner 未给出有效工具调用，使用三路召回兜底。",
+        )
+        for index, tool_name in enumerate(available_tool_names(), start=1)
+    ]
+
+
 def render_tool_specs() -> str:
     """渲染可注入 Planner Prompt 的工具清单"""
 
@@ -112,3 +156,9 @@ def _build_tool_coroutine(
 
     _tool.__name__ = tool_name
     return _tool
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if item is not None]

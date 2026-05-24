@@ -16,7 +16,7 @@ from app.agent.intent import (
     parse_intent_payload,
 )
 from app.agent.llm import llm
-from app.agent.state import DataQueryAgentState
+from app.agent.state import DataQueryAgentState, current_query
 from app.agent.trace import emit_trace
 from app.core.log import logger
 from app.prompt.prompt_loader import load_prompt
@@ -32,7 +32,7 @@ async def route_user_intent(
     writer({"type": "progress", "step": step, "status": "running"})
 
     try:
-        query = state["query"]
+        query = _intent_query(state)
         decision = await _classify_with_llm(query)
 
         # 危险意图
@@ -114,3 +114,13 @@ def _trace_title(category: IntentCategory) -> str:
     if category == IntentCategory.GENERAL_CHAT:
         return "识别为普通问题"
     return "识别为数据查询"
+
+
+def _intent_query(state: DataQueryAgentState) -> str:
+    """意图识别同时保留原始问题和补全后问题，避免追问夹带危险意图"""
+
+    resolved_query = current_query(state)
+    original_query = state["query"]
+    if resolved_query == original_query:
+        return original_query
+    return f"原始问题：{original_query}\n上下文补全问题：{resolved_query}"

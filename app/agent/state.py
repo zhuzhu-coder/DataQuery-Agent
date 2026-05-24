@@ -101,10 +101,20 @@ class EvaluationResultState(TypedDict, total=False):
     clarification_question: str # 需要用户澄清时的问题
 
 
+class ConversationTurnState(TypedDict, total=False):
+    """当前会话中最近几轮问数摘要"""
+
+    role: str # user/assistant
+    content: str # 原始消息或结果描述
+    summary: str # 面向上下文补全的压缩摘要
+
+
 class DataQueryAgentState(TypedDict):
     """一次问数链路中的核心状态"""
 
     query: str  # 用户输入的查询
+    conversation_history: list[ConversationTurnState]  # 最近几轮会话摘要
+    resolved_query: str  # 结合会话历史补全后的独立问题
     keywords: list[str]  # 从用户查询中抽取的关键词
     retrieved_column_infos: list[ColumnInfo]  # 检索到的字段信息
     retrieved_metric_infos: list[MetricInfo]  # 检索到的指标信息
@@ -130,3 +140,9 @@ class DataQueryAgentState(TypedDict):
     ]  # 当前任务内工具观察结果
     evaluation_result: EvaluationResultState  # SQL 语义评估反馈
     evaluation_attempts: int  # SQL 语义评估次数
+
+
+def current_query(state: DataQueryAgentState) -> str:
+    """返回当前节点应使用的有效问题"""
+
+    return str(state.get("resolved_query") or state["query"])

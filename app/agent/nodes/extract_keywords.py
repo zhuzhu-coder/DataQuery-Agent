@@ -9,7 +9,7 @@ import jieba.analyse
 from langgraph.runtime import Runtime
 
 from app.agent.context import DataQueryAgentContext
-from app.agent.state import DataQueryAgentState
+from app.agent.state import DataQueryAgentState, current_query
 from app.agent.trace import emit_trace
 from app.core.log import logger
 
@@ -22,7 +22,7 @@ async def extract_keywords(state: DataQueryAgentState, runtime: Runtime[DataQuer
     writer({"type": "progress", "step": step, "status": "running"})
 
     try:
-        query = state["query"]
+        query = current_query(state)
 
         # 只保留更可能承载业务含义的词性，减少“的、帮我、一下”这类无检索价值的噪声
         allow_pos = (

@@ -13,7 +13,7 @@ from langgraph.runtime import Runtime
 from app.agent.context import DataQueryAgentContext
 from app.agent.llm import llm
 from app.agent.observations import observation_update
-from app.agent.state import DataQueryAgentState, TableInfoState
+from app.agent.state import DataQueryAgentState, TableInfoState, current_query
 from app.agent.trace import emit_trace, table_trace_items
 from app.core.log import logger
 from app.prompt.prompt_loader import load_prompt
@@ -27,7 +27,7 @@ async def filter_table(state: DataQueryAgentState, runtime: Runtime[DataQueryAge
     writer({"type": "progress", "step": step, "status": "running"})
 
     try:
-        query = state["query"]
+        query = current_query(state)
         table_infos: list[TableInfoState] = state["table_infos"]
 
         # table_infos 是嵌套结构，转成 YAML 后更适合放进提示词，也保留中文字段说明

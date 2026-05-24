@@ -27,6 +27,10 @@ from app.repositories.mysql.meta.meta_mysql_repository import MetaMySQLRepositor
 from app.repositories.mysql.meta.query_audit_repository import QueryAuditRepository
 from app.repositories.vector.column_vector_repository import ColumnVectorRepository
 from app.repositories.vector.metric_vector_repository import MetricVectorRepository
+from app.services.conversation_memory import (
+    ConversationMemoryStore,
+    conversation_memory_store,
+)
 from app.services.query_service import QueryService
 
 
@@ -93,6 +97,12 @@ async def get_query_audit_repository(
     return QueryAuditRepository(session)
 
 
+async def get_conversation_memory_store() -> ConversationMemoryStore:
+    """获取进程内会话短期记忆缓存"""
+
+    return conversation_memory_store
+
+
 async def get_query_service(
     meta_mysql_repository: Annotated[
         MetaMySQLRepository, Depends(get_meta_mysql_repository)
@@ -113,6 +123,9 @@ async def get_query_service(
     query_audit_repository: Annotated[
         QueryAuditRepository, Depends(get_query_audit_repository)
     ],
+    memory_store: Annotated[
+        ConversationMemoryStore, Depends(get_conversation_memory_store)
+    ],
 ) -> QueryService:
     """组装一次查询所需的业务服务"""
 
@@ -125,4 +138,5 @@ async def get_query_service(
         metric_vector_repository=metric_vector_repository, # 指标向量仓储
         value_es_repository=value_es_repository, # 字段取值全文检索仓储
         query_audit_repository=query_audit_repository, # 查询审计仓储
+        conversation_memory_store=memory_store, # 会话短期记忆
     )

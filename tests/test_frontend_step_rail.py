@@ -16,8 +16,8 @@ class FrontendStepRailTest(unittest.TestCase):
         self.assertIn('label: "recall_column"', source)
         self.assertIn('label: "recall_metric"', source)
         self.assertIn('label: "recall_value"', source)
-        self.assertIn('"M430 244 L430 290"', source)
-        self.assertIn('"M430 336 L430 360', source)
+        self.assertIn('"M430 316 L430 362"', source)
+        self.assertIn('"M430 408 L430 432', source)
 
     def test_tool_nodes_use_same_card_style_as_other_nodes(self):
         source = (

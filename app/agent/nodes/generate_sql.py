@@ -13,7 +13,7 @@ from langgraph.runtime import Runtime
 from app.agent.context import DataQueryAgentContext
 from app.agent.llm import llm
 from app.agent.observations import observation_update
-from app.agent.state import DataQueryAgentState
+from app.agent.state import DataQueryAgentState, current_query
 from app.agent.trace import emit_trace
 from app.core.log import logger
 from app.prompt.prompt_loader import load_prompt
@@ -32,7 +32,7 @@ async def generate_sql(state: DataQueryAgentState, runtime: Runtime[DataQueryAge
         metric_infos = state["metric_infos"]
         date_info = state["date_info"]
         db_info = state["db_info"]
-        query = state["query"]
+        query = current_query(state)
 
         prompt = PromptTemplate(
             template=load_prompt("generate_sql"),

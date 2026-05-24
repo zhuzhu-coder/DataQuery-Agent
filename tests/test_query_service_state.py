@@ -1,6 +1,7 @@
 import unittest
 
 import app.services.query_service as query_service_module
+from app.services.conversation_memory import ConversationTurn
 from app.services.query_service import QueryService
 
 
@@ -23,6 +24,44 @@ class FakeGraph:
         self.context = context
         self.stream_mode = stream_mode
         yield {"type": "progress", "step": "测试", "status": "success"}
+
+
+class FakeResultGraph(FakeGraph):
+    async def astream(self, input, context, stream_mode):
+        self.input = input
+        self.context = context
+        self.stream_mode = stream_mode
+        yield {
+            "type": "trace",
+            "step": "上下文补全",
+            "title": "完成上下文补全",
+            "metadata": {"resolved_query": "统计 2026 年第一季度华东地区 GMV"},
+        }
+        yield {"type": "result", "data": [{"region_name": "华东", "gmv": 100}]}
+
+
+class FakeMemoryStore:
+    def __init__(self):
+        self.appended = []
+
+    def get_history(self, conversation_id: str):
+        return [
+            ConversationTurn(
+                role="user",
+                content="统计 2026 年第一季度各大区 GMV",
+                summary="时间：2026Q1；维度：大区；指标：GMV",
+            )
+        ]
+
+    def append_turn(self, conversation_id: str, role: str, content: str, summary=None):
+        self.appended.append(
+            {
+                "conversation_id": conversation_id,
+                "role": role,
+                "content": content,
+                "summary": summary,
+            }
+        )
 
 
 class QueryServiceStateTest(unittest.IsolatedAsyncioTestCase):
@@ -57,6 +96,37 @@ class QueryServiceStateTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.fake_graph.input["agent_observations"], [])
         self.assertEqual(self.fake_graph.input["evaluation_result"], {})
         self.assertEqual(self.fake_graph.input["evaluation_attempts"], 0)
+
+    async def test_query_injects_and_updates_conversation_memory(self):
+        self.fake_graph = FakeResultGraph()
+        query_service_module.graph = self.fake_graph
+        memory_store = FakeMemoryStore()
+        service = QueryService(
+            meta_mysql_repository=object(),
+            embedding_client=object(),
+            dw_mysql_repository=object(),
+            column_vector_repository=object(),
+            metric_vector_repository=object(),
+            value_es_repository=object(),
+            query_audit_repository=FakeAuditRepository(),
+            conversation_memory_store=memory_store,
+        )
+
+        chunks = [
+            chunk
+            async for chunk in service.query("那华东呢？", conversation_id="conv-1")
+        ]
+
+        self.assertEqual(len(chunks), 2)
+        self.assertEqual(
+            self.fake_graph.input["conversation_history"][0]["content"],
+            "统计 2026 年第一季度各大区 GMV",
+        )
+        self.assertEqual(len(memory_store.appended), 2)
+        self.assertEqual(memory_store.appended[0]["role"], "user")
+        self.assertIn("补全问题", memory_store.appended[0]["summary"])
+        self.assertEqual(memory_store.appended[1]["role"], "assistant")
+        self.assertIn("返回 1 行", memory_store.appended[1]["summary"])
 
 
 if __name__ == "__main__":

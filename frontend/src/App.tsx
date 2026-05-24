@@ -79,7 +79,9 @@ export default function App() {
   const [draft, setDraft] = useState("");
   const [activeController, setActiveController] = useState<AbortController | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const conversationIdRef = useRef(makeId());
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const previousMessageCountRef = useRef(0);
 
   const isStreaming = Boolean(activeController);
   const canSubmit = draft.trim().length > 0 && !isStreaming;
@@ -90,11 +92,23 @@ export default function App() {
   );
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({
-      top: scrollRef.current.scrollHeight,
-      behavior: "smooth",
-    });
-  }, [messages]);
+    const container = scrollRef.current;
+    const previousMessageCount = previousMessageCountRef.current;
+    previousMessageCountRef.current = messages.length;
+    if (!container) return;
+
+    if (messages.length === 0) {
+      container.scrollTo({ top: 0 });
+      return;
+    }
+
+    if (messages.length > previousMessageCount) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  }, [messages.length]);
 
   const startQuery = async (rawQuery = draft) => {
     const query = rawQuery.trim();
@@ -203,7 +217,11 @@ export default function App() {
     };
 
     try {
-      await streamQuery(query, { signal: controller.signal, onEvent });
+      await streamQuery(query, {
+        signal: controller.signal,
+        conversationId: conversationIdRef.current,
+        onEvent,
+      });
       setMessages((current) =>
         current.map((message) =>
           message.id === assistantId && message.status === "streaming"
@@ -237,6 +255,7 @@ export default function App() {
 
   const clearConversation = () => {
     if (isStreaming) return;
+    conversationIdRef.current = makeId();
     setMessages([]);
     setDraft("");
   };

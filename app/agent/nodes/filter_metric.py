@@ -13,7 +13,7 @@ from langgraph.runtime import Runtime
 from app.agent.context import DataQueryAgentContext
 from app.agent.llm import llm
 from app.agent.observations import observation_update
-from app.agent.state import DataQueryAgentState, MetricInfoState
+from app.agent.state import DataQueryAgentState, MetricInfoState, current_query
 from app.agent.trace import emit_trace, metric_trace_items
 from app.core.log import logger
 from app.prompt.prompt_loader import load_prompt
@@ -27,7 +27,7 @@ async def filter_metric(state: DataQueryAgentState, runtime: Runtime[DataQueryAg
     writer({"type": "progress", "step": step, "status": "running"})
 
     try:
-        query = state["query"]
+        query = current_query(state)
         metric_infos: list[MetricInfoState] = state["metric_infos"]
 
         # metric_infos 转成 YAML 后作为候选项交给模型，模型只需要返回被选中的指标名称
