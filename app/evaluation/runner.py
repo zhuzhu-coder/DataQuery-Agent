@@ -83,6 +83,7 @@ def evaluate_case(
     _check_error(expect, error_event, failures)   # 检查报错是否符合预期
     _check_answer(expect, answer_event, failures)  # 检查普通回答是否符合预期
     _check_trace_steps(expect, trace_steps, failures)  # 检查执行步骤是否符合预期
+    _check_trace_metadata(expect, events, failures)  # 检查关键轨迹元数据是否符合预期
     _check_duration(expect, duration_ms, failures)  # 检查耗时是否在允许范围内
 
     return {
@@ -290,6 +291,52 @@ def _check_trace_steps(
     for step in expect.get("trace_steps", []):
         if step not in trace_steps:
             failures.append(f"缺少轨迹节点：{step}")
+
+
+def _check_trace_metadata(
+    expect: dict[str, Any],
+    events: list[dict[str, Any]],
+    failures: list[str],
+):
+    """检查指定 trace 节点的 metadata 是否符合预期"""
+
+    trace_events = [
+        event
+        for event in events
+        if event.get("type") == "trace" and event.get("step")
+    ]
+    for rule in expect.get("trace_metadata", []):
+        step = rule.get("step")
+        key = rule.get("key")
+        if not step or not key:
+            continue
+
+        matched_events = [
+            event for event in trace_events if event.get("step") == step
+        ]
+        if not matched_events:
+            failures.append(f"缺少轨迹元数据节点：{step}")
+            continue
+
+        expected_value = rule.get("equals")
+        actual_value = None
+        key_found = False
+        for event in reversed(matched_events):
+            metadata = event.get("metadata") or {}
+            if key in metadata:
+                actual_value = metadata.get(key)
+                key_found = True
+                break
+
+        if not key_found:
+            failures.append(f"轨迹元数据缺少字段：节点 {step} 的 {key}")
+            continue
+
+        if actual_value != expected_value:
+            failures.append(
+                "轨迹元数据不匹配："
+                f"节点 {step} 的 {key} 期望 {expected_value}，实际 {actual_value}"
+            )
 
 
 def _check_duration(expect: dict[str, Any], duration_ms: int, failures: list[str]):

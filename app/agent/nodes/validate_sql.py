@@ -8,6 +8,7 @@ SQL 校验节点
 from langgraph.runtime import Runtime
 
 from app.agent.context import DataQueryAgentContext
+from app.agent.observations import observation_update
 from app.agent.state import DataQueryAgentState
 from app.agent.trace import emit_trace
 from app.core.log import logger
@@ -41,7 +42,15 @@ async def validate_sql(state: DataQueryAgentState, runtime: Runtime[DataQueryAge
                 metadata={"valid": True},
             )
             logger.info("SQL语法正确")
-            return {"error": None, "error_type": None}
+            return {
+                "error": None,
+                "error_type": None,
+                **observation_update(
+                    "validate_sql",
+                    "数据库 EXPLAIN 校验通过",
+                    {"valid": True},
+                ),
+            }
         except Exception as e:
             # 不抛出异常中断图执行，而是把错误写入状态，供条件分支进入 correct_sql
             message = str(e)
@@ -58,7 +67,15 @@ async def validate_sql(state: DataQueryAgentState, runtime: Runtime[DataQueryAge
                 ],
                 metadata={"valid": False},
             )
-            return {"error": message, "error_type": "syntax"}
+            return {
+                "error": message,
+                "error_type": "syntax",
+                **observation_update(
+                    "validate_sql",
+                    f"数据库 EXPLAIN 校验未通过：{message}",
+                    {"valid": False, "error_type": "syntax"},
+                ),
+            }
 
     except Exception as e:
         logger.error(f"{step} failed: {e}")

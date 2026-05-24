@@ -8,6 +8,7 @@ SQL 安全检查节点
 from langgraph.runtime import Runtime
 
 from app.agent.context import DataQueryAgentContext
+from app.agent.observations import observation_update
 from app.agent.state import DataQueryAgentState
 from app.agent.trace import emit_trace
 from app.conf.app_config import app_config
@@ -37,7 +38,15 @@ async def security_check_sql(
                 title="安全检查已关闭",
                 summary="当前配置未启用 SQL 安全检查，SQL 将继续进入数据库校验。",
             )
-            return {"error": None, "error_type": None}
+            return {
+                "error": None,
+                "error_type": None,
+                **observation_update(
+                    "security_check_sql",
+                    "SQL 安全检查已关闭",
+                    {"enabled": False},
+                ),
+            }
 
         service = SQLSecurityService(
             max_rows=app_config.sql_security.max_rows,
@@ -62,7 +71,19 @@ async def security_check_sql(
                 "timeout_seconds": app_config.sql_security.timeout_seconds,
             },
         )
-        return {"sql": safe_sql, "error": None, "error_type": None}
+        return {
+            "sql": safe_sql,
+            "error": None,
+            "error_type": None,
+            **observation_update(
+                "security_check_sql",
+                "SQL 安全检查通过",
+                {
+                    "enabled": True,
+                    "max_rows": app_config.sql_security.max_rows,
+                },
+            ),
+        }
 
     except SQLSecurityError as e:
         message = str(e)
@@ -75,7 +96,15 @@ async def security_check_sql(
             summary=message,
             items=[{"label": "拒绝原因", "detail": message}],
         )
-        return {"error": message, "error_type": "security"}
+        return {
+            "error": message,
+            "error_type": "security",
+            **observation_update(
+                "security_check_sql",
+                f"SQL 安全检查未通过：{message}",
+                {"enabled": True, "error_type": "security"},
+            ),
+        }
 
     except Exception as e:
         logger.error(f"{step} failed: {e}")

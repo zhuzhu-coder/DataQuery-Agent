@@ -9,6 +9,7 @@
 from langgraph.runtime import Runtime
 
 from app.agent.context import DataQueryAgentContext
+from app.agent.observations import observation_update
 from app.agent.state import (
     ColumnInfoState,
     DataQueryAgentState,
@@ -34,11 +35,15 @@ async def merge_retrieved_info(
 
     try:
         # 检索到的字段信息
-        retrieved_column_infos: list[ColumnInfo] = state["retrieved_column_infos"]
+        retrieved_column_infos: list[ColumnInfo] = state.get(
+            "retrieved_column_infos", []
+        )
         # 检索到的指标信息
-        retrieved_metric_infos: list[MetricInfo] = state["retrieved_metric_infos"]
+        retrieved_metric_infos: list[MetricInfo] = state.get(
+            "retrieved_metric_infos", []
+        )
         # 检索到的字段取值
-        retrieved_value_infos: list[ValueInfo] = state["retrieved_value_infos"]
+        retrieved_value_infos: list[ValueInfo] = state.get("retrieved_value_infos", [])
 
         meta_mysql_repository = runtime.context["meta_mysql_repository"]
 
@@ -168,6 +173,14 @@ async def merge_retrieved_info(
         return {
             "table_infos": table_infos,
             "metric_infos": metric_infos,
+            **observation_update(
+                "merge_retrieved_info",
+                f"合并出 {len(table_infos)} 张候选表、{len(metric_infos)} 个候选指标",
+                {
+                    "table_count": len(table_infos),
+                    "metric_count": len(metric_infos),
+                },
+            ),
         }
     except Exception as e:
         logger.error(f"{step} failed: {e}")

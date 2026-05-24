@@ -48,6 +48,20 @@ function stopRunningSteps(steps: StepState[] = []) {
   );
 }
 
+function upsertStoppedStep(steps: StepState[] = [], step: string) {
+  const next = steps.filter((item) => item.step !== step);
+  next.push({
+    step,
+    status: "stopped",
+    updatedAt: Date.now(),
+  });
+  return next;
+}
+
+function markQueryStopped(steps: StepState[] = []) {
+  return upsertStoppedStep(stopRunningSteps(steps), "查询终止");
+}
+
 function markQueryFailed(steps: StepState[] = []) {
   return upsertStep(stopRunningSteps(steps), {
     type: "progress",
@@ -207,7 +221,7 @@ export default function App() {
                 status: isAbort ? "done" : "error",
                 content: isAbort ? "已停止本次查询。" : "无法连接问数接口。",
                 error: isAbort ? undefined : error instanceof Error ? error.message : String(error),
-                steps: isAbort ? stopRunningSteps(message.steps) : message.steps,
+                steps: isAbort ? markQueryStopped(message.steps) : message.steps,
               }
             : message,
         ),

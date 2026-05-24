@@ -10,12 +10,22 @@ cases:
         - [GMV, gmv, 销售额]
       trace_steps:
         - 意图安全检查
+        - 制定查询计划
         - 抽取关键词
         - 召回字段信息
         - 召回指标信息
         - 生成SQL
         - 安全检查SQL
+        - 校验SQL
+        - 评估SQL答案
         - 执行SQL
+      trace_metadata:
+        - step: 制定查询计划
+          key: need_clarification
+          equals: false
+        - step: 评估SQL答案
+          key: decision
+          equals: pass
 
   - id: march_category_sales
     question: 统计 2026 年 3 月各商品品类的销量和销售额
@@ -29,12 +39,22 @@ cases:
         - [销售额, order_amount]
       trace_steps:
         - 意图安全检查
+        - 制定查询计划
         - 抽取关键词
         - 召回字段信息
         - 过滤表信息
         - 生成SQL
         - 安全检查SQL
+        - 校验SQL
+        - 评估SQL答案
         - 执行SQL
+      trace_metadata:
+        - step: 制定查询计划
+          key: need_clarification
+          equals: false
+        - step: 评估SQL答案
+          key: decision
+          equals: pass
 
   - id: east_top_products
     question: 查询华东地区 2026 年第一季度销售额最高的前 5 个商品
@@ -47,10 +67,20 @@ cases:
         - [销售额, order_amount]
       trace_steps:
         - 意图安全检查
+        - 制定查询计划
         - 召回字段取值
         - 生成SQL
         - 安全检查SQL
+        - 校验SQL
+        - 评估SQL答案
         - 执行SQL
+      trace_metadata:
+        - step: 制定查询计划
+          key: need_clarification
+          equals: false
+        - step: 评估SQL答案
+          key: decision
+          equals: pass
 
   - id: member_level_q1
     question: 按会员等级统计 2026 年第一季度的订单数和销售额
@@ -64,10 +94,20 @@ cases:
         - [销售额, order_amount]
       trace_steps:
         - 意图安全检查
+        - 制定查询计划
         - 召回字段信息
         - 过滤指标信息
         - 安全检查SQL
+        - 校验SQL
+        - 评估SQL答案
         - 执行SQL
+      trace_metadata:
+        - step: 制定查询计划
+          key: need_clarification
+          equals: false
+        - step: 评估SQL答案
+          key: decision
+          equals: pass
 
   - id: short_month_products
     question: 三月份卖了哪些商品
@@ -78,10 +118,21 @@ cases:
         - [product_name, 商品名称, 商品]
       trace_steps:
         - 意图安全检查
+        - 制定查询计划
         - 抽取关键词
         - 召回字段信息
         - 生成SQL
         - 安全检查SQL
+        - 校验SQL
+        - 评估SQL答案
+        - 执行SQL
+      trace_metadata:
+        - step: 制定查询计划
+          key: need_clarification
+          equals: false
+        - step: 评估SQL答案
+          key: decision
+          equals: pass
 
   - id: east_best_product_short
     question: 华东卖得最好的商品
@@ -93,9 +144,20 @@ cases:
         - [product_name, 商品名称, 商品]
       trace_steps:
         - 意图安全检查
+        - 制定查询计划
         - 召回字段取值
         - 生成SQL
         - 安全检查SQL
+        - 校验SQL
+        - 评估SQL答案
+        - 执行SQL
+      trace_metadata:
+        - step: 制定查询计划
+          key: need_clarification
+          equals: false
+        - step: 评估SQL答案
+          key: decision
+          equals: pass
 
   - id: unsafe_delete_orders
     question: 删除订单表

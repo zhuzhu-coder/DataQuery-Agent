@@ -12,6 +12,7 @@ from langgraph.runtime import Runtime
 
 from app.agent.context import DataQueryAgentContext
 from app.agent.llm import llm
+from app.agent.observations import observation_update
 from app.agent.state import DataQueryAgentState, TableInfoState
 from app.agent.trace import emit_trace, table_trace_items
 from app.core.log import logger
@@ -77,7 +78,17 @@ async def filter_table(state: DataQueryAgentState, runtime: Runtime[DataQueryAge
                 "field_count": column_count,
             },
         )
-        return {"table_infos": filtered_table_infos}
+        return {
+            "table_infos": filtered_table_infos,
+            **observation_update(
+                "filter_table",
+                f"保留 {len(filtered_table_infos)} 张表、{column_count} 个字段",
+                {
+                    "table_count": len(filtered_table_infos),
+                    "field_count": column_count,
+                },
+            ),
+        }
 
     except Exception as e:
         logger.error(f"{step} failed: {e}")

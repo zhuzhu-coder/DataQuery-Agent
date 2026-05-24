@@ -10,6 +10,7 @@ from time import perf_counter
 from langgraph.runtime import Runtime
 
 from app.agent.context import DataQueryAgentContext
+from app.agent.observations import observation_update
 from app.agent.state import DataQueryAgentState
 from app.agent.trace import emit_trace
 from app.conf.app_config import app_config
@@ -61,6 +62,11 @@ async def run_sql(state: DataQueryAgentState, runtime: Runtime[DataQueryAgentCon
             metadata={"row_count": len(result), "duration_ms": duration_ms},
         )
         writer({"type": "result", "data": result})
+        return observation_update(
+            "run_sql",
+            f"SQL 执行完成，返回 {len(result)} 行",
+            {"row_count": len(result), "duration_ms": duration_ms},
+        )
 
     except Exception as e:
         logger.error(f"{step} failed: {e}")

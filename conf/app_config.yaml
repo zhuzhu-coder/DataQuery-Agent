@@ -51,7 +51,7 @@ es:
 
 # 大模型配置
 llm: 
-  model_name: qwen3.6-plus # 大模型模型名称
+  model_name: qwen3.6-flash # 大模型模型名称
   api_key: ${oc.env:LLM_API_KEY} # 大模型 API 密钥
   base_url: https://dashscope.aliyuncs.com/compatible-mode/v1 # 大模型服务基础 URL
 

@@ -12,6 +12,7 @@ from langgraph.runtime import Runtime
 
 from app.agent.context import DataQueryAgentContext
 from app.agent.llm import llm
+from app.agent.observations import observation_update
 from app.agent.state import DataQueryAgentState, MetricInfoState
 from app.agent.trace import emit_trace, metric_trace_items
 from app.core.log import logger
@@ -65,7 +66,14 @@ async def filter_metric(state: DataQueryAgentState, runtime: Runtime[DataQueryAg
             items=metric_trace_items(filtered_metric_infos),
             metadata={"metric_count": len(filtered_metric_infos)},
         )
-        return {"metric_infos": filtered_metric_infos}
+        return {
+            "metric_infos": filtered_metric_infos,
+            **observation_update(
+                "filter_metric",
+                f"保留 {len(filtered_metric_infos)} 个候选指标",
+                {"metric_count": len(filtered_metric_infos)},
+            ),
+        }
 
     except Exception as e:
         logger.error(f"{step} failed: {e}")

@@ -10,6 +10,7 @@ from datetime import date
 from langgraph.runtime import Runtime
 
 from app.agent.context import DataQueryAgentContext
+from app.agent.observations import observation_update
 from app.agent.state import DataQueryAgentState, DateInfoState, DBInfoState
 from app.agent.trace import emit_trace
 from app.core.log import logger
@@ -55,7 +56,19 @@ async def add_extra_context(state: DataQueryAgentState, runtime: Runtime[DataQue
             ],
             metadata={"date": date_info["date"], "dialect": db_info["dialect"]},
         )
-        return {"date_info": date_info, "db_info": db_info}
+        return {
+            "date_info": date_info,
+            "db_info": db_info,
+            **observation_update(
+                "add_extra_context",
+                f"补齐日期 {date_info['date']} 和数据库 {db_info['dialect']} {db_info['version']}",
+                {
+                    "date": date_info["date"],
+                    "dialect": db_info["dialect"],
+                    "version": db_info["version"],
+                },
+            ),
+        }
 
     except Exception as e:
         logger.error(f"{step} failed: {e}")

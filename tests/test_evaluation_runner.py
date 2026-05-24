@@ -110,6 +110,77 @@ class EvaluationRunnerTest(unittest.TestCase):
         self.assertEqual(result["status"], "answered")
         self.assertEqual(result["answer"], "你好，我是 Data Query Agent，可以帮你查询电商数据。")
 
+    def test_evaluate_case_passes_trace_metadata_expectations(self):
+        case = {
+            "id": "region_gmv",
+            "question": "统计各地区 GMV",
+            "expect": {
+                "status": "success",
+                "trace_metadata": [
+                    {
+                        "step": "制定查询计划",
+                        "key": "need_clarification",
+                        "equals": False,
+                    },
+                    {
+                        "step": "评估SQL答案",
+                        "key": "decision",
+                        "equals": "pass",
+                    },
+                ],
+            },
+        }
+        events = [
+            {
+                "type": "trace",
+                "step": "制定查询计划",
+                "metadata": {"need_clarification": False},
+            },
+            {
+                "type": "trace",
+                "step": "评估SQL答案",
+                "metadata": {"decision": "pass"},
+            },
+            {"type": "result", "data": [{"地区": "华东", "GMV": 100}]},
+        ]
+
+        result = evaluate_case(case, events, duration_ms=42)
+
+        self.assertTrue(result["passed"])
+        self.assertEqual(result["failures"], [])
+
+    def test_evaluate_case_reports_trace_metadata_mismatch(self):
+        case = {
+            "id": "region_gmv",
+            "question": "统计各地区 GMV",
+            "expect": {
+                "status": "success",
+                "trace_metadata": [
+                    {
+                        "step": "评估SQL答案",
+                        "key": "decision",
+                        "equals": "pass",
+                    }
+                ],
+            },
+        }
+        events = [
+            {
+                "type": "trace",
+                "step": "评估SQL答案",
+                "metadata": {"decision": "revise_sql"},
+            },
+            {"type": "result", "data": [{"地区": "华东", "GMV": 100}]},
+        ]
+
+        result = evaluate_case(case, events, duration_ms=42)
+
+        self.assertFalse(result["passed"])
+        self.assertIn(
+            "轨迹元数据不匹配：节点 评估SQL答案 的 decision 期望 pass，实际 revise_sql",
+            result["failures"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

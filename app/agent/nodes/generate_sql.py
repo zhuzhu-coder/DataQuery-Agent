@@ -12,6 +12,7 @@ from langgraph.runtime import Runtime
 
 from app.agent.context import DataQueryAgentContext
 from app.agent.llm import llm
+from app.agent.observations import observation_update
 from app.agent.state import DataQueryAgentState
 from app.agent.trace import emit_trace
 from app.core.log import logger
@@ -84,7 +85,17 @@ async def generate_sql(state: DataQueryAgentState, runtime: Runtime[DataQueryAge
                 "metric_count": len(metric_infos),
             },
         )
-        return {"sql": result}
+        return {
+            "sql": result,
+            **observation_update(
+                "generate_sql",
+                "生成候选 SQL",
+                {
+                    "table_count": len(table_infos),
+                    "metric_count": len(metric_infos),
+                },
+            ),
+        }
 
     except Exception as e:
         logger.error(f"{step} failed: {e}")

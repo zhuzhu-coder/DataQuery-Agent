@@ -39,3 +39,21 @@ eval/reports/latest.md
 ```
 
 `latest.json` 适合机器读取，`latest.md` 适合人工排查
+
+## 断言能力
+
+`cases.yaml` 中的 `expect.trace_steps` 用于检查是否出现指定执行节点。
+
+如果需要检查某个 trace 节点的结构化元数据，可以使用 `trace_metadata`：
+
+```yaml
+trace_metadata:
+  - step: 制定查询计划
+    key: need_clarification
+    equals: false
+  - step: 评估SQL答案
+    key: decision
+    equals: pass
+```
+
+这可以用来验证 Planner 和 Evaluator 是否按预期工作，而不只是验证最终有没有返回结果。

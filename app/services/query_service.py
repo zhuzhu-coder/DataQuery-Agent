@@ -57,6 +57,10 @@ class QueryService:
             query=query,
             audit_id=audit_id,
             correction_attempts=0,
+            agent_plan={},
+            agent_observations=[],
+            evaluation_result={},
+            evaluation_attempts=0,
         )
         # Context 保存本次图执行需要复用的外部依赖，节点通过 runtime.context 读取
         context = DataQueryAgentContext(

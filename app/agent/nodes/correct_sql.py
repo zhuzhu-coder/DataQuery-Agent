@@ -12,6 +12,7 @@ from langgraph.runtime import Runtime
 
 from app.agent.context import DataQueryAgentContext
 from app.agent.llm import llm
+from app.agent.observations import observation_update
 from app.agent.state import DataQueryAgentState
 from app.agent.trace import emit_trace
 from app.core.log import logger
@@ -33,9 +34,9 @@ async def correct_sql(state: DataQueryAgentState, runtime: Runtime[DataQueryAgen
         db_info = state["db_info"]
         query = state["query"]
 
-        # sql 是待修正的候选 SQL，error 是数据库 explain 返回的具体错误信息
+        # sql 是待修正的候选 SQL，error 可能来自数据库 explain，也可能来自语义评估
         sql = state["sql"]
-        error = state["error"]
+        error = _correction_feedback(state)
 
         prompt = PromptTemplate(
             template=load_prompt("correct_sql"),
@@ -94,8 +95,33 @@ async def correct_sql(state: DataQueryAgentState, runtime: Runtime[DataQueryAgen
             "error": None,
             "error_type": None,
             "correction_attempts": correction_attempts,
+            **observation_update(
+                "correct_sql",
+                f"完成第 {correction_attempts} 次 SQL 修正",
+                {"correction_attempts": correction_attempts},
+            ),
         }
     except Exception as e:
         logger.error(f"{step} failed: {e}")
         writer({"type": "progress", "step": step, "status": "error"})
         raise
+
+
+def _correction_feedback(state: DataQueryAgentState) -> str:
+    """优先使用数据库错误；没有语法错误时使用 SQL 语义评估反馈"""
+
+    error = state.get("error")
+    if error:
+        return str(error)
+
+    evaluation_result = state.get("evaluation_result") or {}
+    feedback_parts = [
+        str(evaluation_result.get("reason") or ""),
+        str(evaluation_result.get("suggested_fix") or ""),
+    ]
+    issues = evaluation_result.get("issues") or []
+    if issues:
+        feedback_parts.append("；".join(str(issue) for issue in issues))
+
+    feedback = "；".join(part for part in feedback_parts if part)
+    return feedback or "SQL 语义评估未通过，请按原问题和上下文进行最小必要修正。"
