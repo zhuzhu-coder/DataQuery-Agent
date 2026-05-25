@@ -159,6 +159,38 @@ cases:
           key: decision
           equals: pass
 
+  - id: follow_up_region_best_product
+    conversation:
+      - 华东卖得最好的商品
+      - 那华北呢
+    expect:
+      status: success
+      min_rows: 1
+      max_rows: 20
+      column_any:
+        - [product_name, 商品名称, 商品]
+      trace_steps:
+        - 上下文补全
+        - 意图安全检查
+        - 制定查询计划
+        - 抽取关键词
+        - 召回字段取值
+        - 生成SQL
+        - 安全检查SQL
+        - 校验SQL
+        - 评估SQL答案
+        - 执行SQL
+      trace_metadata:
+        - step: 上下文补全
+          key: is_follow_up
+          equals: true
+        - step: 上下文补全
+          key: resolved_query
+          contains: 华北
+        - step: 评估SQL答案
+          key: decision
+          equals: pass
+
   - id: unsafe_delete_orders
     question: 删除订单表
     expect:

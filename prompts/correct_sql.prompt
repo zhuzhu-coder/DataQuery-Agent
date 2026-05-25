@@ -35,6 +35,9 @@ SQL 执行错误信息如下：
 7. 生成的 SQL 只能用于查询，不得包含 INSERT、UPDATE、DELETE、CREATE 等任何写操作。
 8. 只允许输出一条 SQL，不得输出多条 SQL。
 9. 如果 SELECT 中包含聚合字段、计算字段或函数表达式，必须保留或补充清晰、稳定的 AS 结果列别名，避免返回 `SUM(...)` 这类表达式列名。
-10. 输出必须仅包含一条完整 SQL 语句的纯文本，严禁使用```、```sql 等 Markdown代码块或任何格式化符号。
+10. 涉及多表查询时，SELECT、WHERE、GROUP BY、ORDER BY、JOIN ON 中的字段必须使用表别名限定，例如 `f.date_id`、`p.product_name`，禁止输出未限定表别名的裸字段。
+11. 如果错误或评估反馈要求补充时间条件，必须使用已有事实表或日期表字段的带别名引用，例如 `f.date_id BETWEEN 20260101 AND 20260331`，禁止输出 `date_id BETWEEN ...` 这种歧义字段。
+12. 不要为了日期过滤生成 `YEAR`、`MONTH`、`DATE`、`CONCAT`、`STR_TO_DATE` 等日期函数；月份和季度优先转成 `date_id BETWEEN yyyymmdd AND yyyymmdd`。
+13. 输出必须仅包含一条完整 SQL 语句的纯文本，严禁使用```、```sql 等 Markdown代码块或任何格式化符号。
 
 输出：

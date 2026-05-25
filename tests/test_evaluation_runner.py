@@ -1,6 +1,21 @@
+import asyncio
 import unittest
 
-from app.evaluation.runner import evaluate_case, parse_sse_events
+from app.evaluation.runner import collect_case_events, evaluate_case, parse_sse_events
+
+
+class FakeQueryService:
+    def __init__(self):
+        self.calls = []
+
+    async def query(self, question, conversation_id=None):
+        self.calls.append(
+            {"question": question, "conversation_id": conversation_id}
+        )
+        yield (
+            'data: {"type": "trace", "step": "上下文补全", '
+            f'"metadata": {{"resolved_query": "{question}"}}}}\n\n'
+        )
 
 
 class EvaluationRunnerTest(unittest.TestCase):
@@ -180,6 +195,90 @@ class EvaluationRunnerTest(unittest.TestCase):
             "轨迹元数据不匹配：节点 评估SQL答案 的 decision 期望 pass，实际 revise_sql",
             result["failures"],
         )
+
+    def test_evaluate_case_passes_trace_metadata_contains_expectation(self):
+        case = {
+            "id": "follow_up",
+            "question": "那华东呢",
+            "expect": {
+                "status": "success",
+                "trace_metadata": [
+                    {
+                        "step": "上下文补全",
+                        "key": "resolved_query",
+                        "contains": "华东",
+                    }
+                ],
+            },
+        }
+        events = [
+            {
+                "type": "trace",
+                "step": "上下文补全",
+                "metadata": {"resolved_query": "统计 2026 年第一季度华东地区 GMV"},
+            },
+            {"type": "result", "data": [{"GMV": 100}]},
+        ]
+
+        result = evaluate_case(case, events, duration_ms=42)
+
+        self.assertTrue(result["passed"])
+
+    def test_evaluate_case_reports_trace_metadata_contains_mismatch(self):
+        case = {
+            "id": "follow_up",
+            "question": "那华东呢",
+            "expect": {
+                "status": "success",
+                "trace_metadata": [
+                    {
+                        "step": "上下文补全",
+                        "key": "resolved_query",
+                        "contains": "华东",
+                    }
+                ],
+            },
+        }
+        events = [
+            {
+                "type": "trace",
+                "step": "上下文补全",
+                "metadata": {"resolved_query": "统计 2026 年第一季度华北地区 GMV"},
+            },
+            {"type": "result", "data": [{"GMV": 100}]},
+        ]
+
+        result = evaluate_case(case, events, duration_ms=42)
+
+        self.assertFalse(result["passed"])
+        self.assertIn(
+            "轨迹元数据不包含：节点 上下文补全 的 resolved_query 期望包含 华东",
+            result["failures"][0],
+        )
+
+    def test_collect_case_events_runs_conversation_with_same_id(self):
+        query_service = FakeQueryService()
+        case = {
+            "id": "follow_up",
+            "conversation": ["统计第一季度各大区 GMV", "那华东呢"],
+        }
+
+        events = asyncio.run(collect_case_events(query_service, case))
+
+        self.assertEqual(
+            query_service.calls,
+            [
+                {
+                    "question": "统计第一季度各大区 GMV",
+                    "conversation_id": "eval-follow_up",
+                },
+                {
+                    "question": "那华东呢",
+                    "conversation_id": "eval-follow_up",
+                },
+            ],
+        )
+        self.assertEqual(events[-1]["metadata"]["resolved_query"], "那华东呢")
 
 
 if __name__ == "__main__":

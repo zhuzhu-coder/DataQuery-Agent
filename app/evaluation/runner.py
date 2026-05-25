@@ -39,13 +39,35 @@ def parse_sse_events(chunks: list[str]) -> list[dict[str, Any]]:
     return events
 
 
-async def collect_query_events(query_service: Any, question: str) -> list[dict[str, Any]]:
+async def collect_query_events(
+    query_service: Any, question: str, conversation_id: str | None = None
+) -> list[dict[str, Any]]:
     """执行一次 QueryService 查询并收集结构化 SSE 事件"""
     # 收集所有事件
     chunks = []
-    async for chunk in query_service.query(question):
+    async for chunk in query_service.query(question, conversation_id=conversation_id):
         chunks.append(chunk)
     return parse_sse_events(chunks)
+
+
+async def collect_case_events(query_service: Any, case: dict[str, Any]) -> list[dict[str, Any]]:
+    """执行单轮或多轮评测用例，并返回最后一轮的事件"""
+
+    conversation = case.get("conversation")
+    if not conversation:
+        return await collect_query_events(query_service, str(case["question"]))
+    if not isinstance(conversation, list) or not conversation:
+        raise ValueError(f"用例 {case.get('id')} 的 conversation 必须是非空列表")
+
+    conversation_id = f"eval-{case.get('id')}"
+    events: list[dict[str, Any]] = []
+    for question in conversation:
+        events = await collect_query_events(
+            query_service,
+            str(question),
+            conversation_id=conversation_id,
+        )
+    return events
 
 
 def evaluate_case(
@@ -88,7 +110,7 @@ def evaluate_case(
 
     return {
         "id": case.get("id"),
-        "question": case.get("question"),
+        "question": _case_question(case),
         "passed": not failures,
         "status": status,
         "duration_ms": duration_ms,
@@ -319,6 +341,7 @@ def _check_trace_metadata(
             continue
 
         expected_value = rule.get("equals")
+        expected_contains = rule.get("contains")
         actual_value = None
         key_found = False
         for event in reversed(matched_events):
@@ -332,10 +355,15 @@ def _check_trace_metadata(
             failures.append(f"轨迹元数据缺少字段：节点 {step} 的 {key}")
             continue
 
-        if actual_value != expected_value:
+        if "equals" in rule and actual_value != expected_value:
             failures.append(
                 "轨迹元数据不匹配："
                 f"节点 {step} 的 {key} 期望 {expected_value}，实际 {actual_value}"
+            )
+        if expected_contains is not None and expected_contains not in str(actual_value):
+            failures.append(
+                "轨迹元数据不包含："
+                f"节点 {step} 的 {key} 期望包含 {expected_contains}，实际 {actual_value}"
             )
 
 
@@ -344,3 +372,13 @@ def _check_duration(expect: dict[str, Any], duration_ms: int, failures: list[str
     """检查耗时是否在允许范围内"""
     if max_duration_ms is not None and duration_ms > max_duration_ms:
         failures.append(f"耗时过长：最多 {max_duration_ms}ms，实际 {duration_ms}ms")
+
+
+def _case_question(case: dict[str, Any]) -> str:
+    question = case.get("question")
+    if question:
+        return str(question)
+    conversation = case.get("conversation")
+    if isinstance(conversation, list):
+        return " -> ".join(str(item) for item in conversation)
+    return ""

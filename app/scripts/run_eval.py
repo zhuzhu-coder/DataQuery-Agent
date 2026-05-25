@@ -19,7 +19,7 @@ from app.clients.mysql_client_manager import (
 )
 from app.evaluation.runner import (
     build_report,
-    collect_query_events,
+    collect_case_events,
     evaluate_case,
     load_cases,
     write_reports,
@@ -30,6 +30,7 @@ from app.repositories.mysql.meta.meta_mysql_repository import MetaMySQLRepositor
 from app.repositories.mysql.meta.query_audit_repository import QueryAuditRepository
 from app.repositories.vector.column_vector_repository import ColumnVectorRepository
 from app.repositories.vector.metric_vector_repository import MetricVectorRepository
+from app.services.conversation_memory import ConversationMemoryStore
 from app.services.query_service import QueryService
 
 
@@ -65,6 +66,7 @@ async def run_eval(
         ):
             query_audit_repository = QueryAuditRepository(meta_session)
             await query_audit_repository.ensure_table()
+            memory_store = ConversationMemoryStore()
             query_service = QueryService(
                 meta_mysql_repository=MetaMySQLRepository(meta_session),
                 embedding_client=embedding_client_manager.client,
@@ -77,13 +79,14 @@ async def run_eval(
                 ),
                 value_es_repository=ValueESRepository(es_client_manager.client),
                 query_audit_repository=query_audit_repository,
+                conversation_memory_store=memory_store,
             )
 
             results = []
             for case in cases:
-                print(f"RUN {case['id']} - {case['question']}")
+                print(f"RUN {case['id']} - {_case_question(case)}")
                 start = perf_counter()
-                events = await collect_query_events(query_service, case["question"])# 所有事件
+                events = await collect_case_events(query_service, case)# 所有事件
                 duration_ms = int((perf_counter() - start) * 1000)
                 result = evaluate_case(case, events, duration_ms)
                 results.append(result)
@@ -125,6 +128,16 @@ def _print_summary(report: dict, output_dir: Path):
     print(f"失败：{report['failed']}")
     print(f"通过率：{report['pass_rate']:.1%}")
     print(f"报告：{output_dir / 'latest.md'}")
+
+
+def _case_question(case: dict) -> str:
+    question = case.get("question")
+    if question:
+        return str(question)
+    conversation = case.get("conversation")
+    if isinstance(conversation, list):
+        return " -> ".join(str(item) for item in conversation)
+    return ""
 
 
 def main():
