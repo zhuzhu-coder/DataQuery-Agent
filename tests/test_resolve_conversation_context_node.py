@@ -30,7 +30,6 @@ class ResolveConversationContextNodeTest(unittest.TestCase):
                 {
                     "role": "user",
                     "content": "统计 2026 年第一季度各大区 GMV",
-                    "summary": "时间：2026Q1；维度：大区；指标：GMV",
                 }
             ],
         }
@@ -70,15 +69,18 @@ class ResolveConversationContextNodeTest(unittest.TestCase):
     def test_build_history_messages_uses_langchain_message_types(self):
         messages = _build_history_messages(
             [
-                {"role": "user", "content": "统计 GMV", "summary": "指标：GMV"},
-                {"role": "assistant", "content": "已返回结果", "summary": "返回 3 行"},
+                {"role": "system", "content": "之前对话：用户在看 GMV"},
+                {"role": "user", "content": "统计 GMV"},
+                {"role": "assistant", "content": "已返回结果"},
             ]
         )
 
-        self.assertEqual(messages[0].type, "human")
-        self.assertIn("统计 GMV", messages[0].content)
-        self.assertIn("指标：GMV", messages[0].content)
-        self.assertEqual(messages[1].type, "ai")
+        self.assertEqual(messages[0].type, "system")
+        self.assertIn("之前对话", messages[0].content)
+        self.assertEqual(messages[1].type, "human")
+        self.assertIn("统计 GMV", messages[1].content)
+        self.assertNotIn("摘要", messages[1].content)
+        self.assertEqual(messages[2].type, "ai")
 
     def test_prompt_json_example_does_not_create_extra_template_variables(self):
         prompt = ChatPromptTemplate.from_messages(

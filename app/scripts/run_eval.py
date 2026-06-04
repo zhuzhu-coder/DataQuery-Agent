@@ -17,6 +17,8 @@ from app.clients.mysql_client_manager import (
     dw_mysql_client_manager,
     meta_mysql_client_manager,
 )
+from app.clients.redis_client_manager import redis_client_manager
+from app.conf.app_config import app_config
 from app.evaluation.runner import (
     build_report,
     collect_case_events,
@@ -66,7 +68,13 @@ async def run_eval(
         ):
             query_audit_repository = QueryAuditRepository(meta_session)
             await query_audit_repository.ensure_table()
-            memory_store = ConversationMemoryStore()
+            memory_store = ConversationMemoryStore(
+                redis_client=redis_client_manager.client,
+                key_prefix=app_config.redis.key_prefix,
+                ttl_seconds=app_config.redis.ttl_seconds,
+                max_messages_before_compaction=app_config.redis.max_messages_before_compaction,
+                recent_messages_after_compaction=app_config.redis.recent_messages_after_compaction,
+            )
             query_service = QueryService(
                 meta_mysql_repository=MetaMySQLRepository(meta_session),
                 embedding_client=embedding_client_manager.client,
@@ -107,6 +115,7 @@ def _init_clients():
     milvus_client_manager.init()
     embedding_client_manager.init()
     es_client_manager.init()
+    redis_client_manager.init()
     meta_mysql_client_manager.init()
     dw_mysql_client_manager.init()
 
@@ -116,6 +125,7 @@ async def _close_clients():
     await embedding_client_manager.close()
     await milvus_client_manager.close()
     await es_client_manager.close()
+    await redis_client_manager.close()
     await meta_mysql_client_manager.close()
     await dw_mysql_client_manager.close()
 

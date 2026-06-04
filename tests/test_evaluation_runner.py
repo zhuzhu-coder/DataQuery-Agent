@@ -7,6 +7,7 @@ from app.evaluation.runner import collect_case_events, evaluate_case, parse_sse_
 class FakeQueryService:
     def __init__(self):
         self.calls = []
+        self.conversation_memory_store = None
 
     async def query(self, question, conversation_id=None):
         self.calls.append(
@@ -16,6 +17,14 @@ class FakeQueryService:
             'data: {"type": "trace", "step": "上下文补全", '
             f'"metadata": {{"resolved_query": "{question}"}}}}\n\n'
         )
+
+
+class FakeMemoryStore:
+    def __init__(self):
+        self.cleared = []
+
+    async def clear(self, conversation_id):
+        self.cleared.append(conversation_id)
 
 
 class EvaluationRunnerTest(unittest.TestCase):
@@ -258,6 +267,7 @@ class EvaluationRunnerTest(unittest.TestCase):
 
     def test_collect_case_events_runs_conversation_with_same_id(self):
         query_service = FakeQueryService()
+        query_service.conversation_memory_store = FakeMemoryStore()
         case = {
             "id": "follow_up",
             "conversation": ["统计第一季度各大区 GMV", "那华东呢"],
@@ -277,6 +287,10 @@ class EvaluationRunnerTest(unittest.TestCase):
                     "conversation_id": "eval-follow_up",
                 },
             ],
+        )
+        self.assertEqual(
+            query_service.conversation_memory_store.cleared,
+            ["eval-follow_up"],
         )
         self.assertEqual(events[-1]["metadata"]["resolved_query"], "那华东呢")
 

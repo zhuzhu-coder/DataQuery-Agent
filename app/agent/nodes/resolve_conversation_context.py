@@ -7,7 +7,7 @@
 
 from typing import Any
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langgraph.runtime import Runtime
@@ -100,19 +100,17 @@ async def _resolve_with_llm(
 
 
 def _build_history_messages(history: list[ConversationTurnState]) -> list[BaseMessage]:
-    """将会话摘要转换为 LangChain 消息对象"""
+    """将会话历史转换为 LangChain 消息对象"""
 
     messages: list[BaseMessage] = []
     for turn in history:
         role = str(turn.get("role") or "")
-        content_parts = [str(turn.get("content") or "")]
-        summary = turn.get("summary")
-        if summary:
-            content_parts.append(f"摘要：{summary}")
-        content = "\n".join(part for part in content_parts if part)
+        content = str(turn.get("content") or "")
         if not content:
             continue
-        if role == "assistant":
+        if role == "system":
+            messages.append(SystemMessage(content=content))
+        elif role == "assistant":
             messages.append(AIMessage(content=content))
         else:
             messages.append(HumanMessage(content=content))

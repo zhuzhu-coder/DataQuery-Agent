@@ -9,11 +9,16 @@
 import json
 from typing import Any
 
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+
 from app.agent.context import DataQueryAgentContext
 from app.agent.graph import graph
+from app.agent.llm import llm
 from app.agent.state import DataQueryAgentState
 from app.clients.embedding_client_manager import EmbeddingClient
 from app.core.context import request_id_ctx_var
+from app.prompt.prompt_loader import load_prompt
 from app.repositories.es.value_es_repository import ValueESRepository
 from app.repositories.mysql.dw.dw_mysql_repository import DWMySQLRepository
 from app.repositories.mysql.meta.meta_mysql_repository import MetaMySQLRepository
@@ -56,8 +61,8 @@ class QueryService:
             request_id=request_id_ctx_var.get(),
             query=query,
         )
-        # 读取会话历史摘要
-        conversation_history = self._conversation_history(conversation_id)
+        # 读取会话历史消息
+        conversation_history = await self._conversation_history(conversation_id)
         # State 只放会被图节点读写和合并的业务数据，外部工具对象不塞进 State
         state = DataQueryAgentState(
             query=query,
@@ -81,7 +86,7 @@ class QueryService:
             query_audit_repository=self.query_audit_repository,
         )
         resolved_query = query
-        final_summary = ""
+        assistant_memory_content = ""
         try:
             # stream_mode="custom" 对应节点内部 writer(...) 写出的进度消息
             async for chunk in graph.astream(
@@ -94,16 +99,16 @@ class QueryService:
                             _resolved_query_from_event(chunk) or resolved_query
                         )
                     elif event_type in {"result", "answer"}:
-                        final_summary = _memory_summary_from_event(chunk)
+                        assistant_memory_content = _memory_content_from_event(chunk)
                 # SSE 要求每条消息以 data: 开头，并以两个换行符结束
                 # ensure_ascii=False 中文字符不转义，default=str 兜底处理日期等非 JSON 类型
                 yield f"data: {json.dumps(chunk, ensure_ascii=False, default=str)}\n\n"
-            if final_summary:
-                self._append_memory(
+            if assistant_memory_content:
+                await self._append_memory(
                     conversation_id=conversation_id,
                     query=query,
                     resolved_query=resolved_query,
-                    summary=final_summary,
+                    assistant_content=assistant_memory_content,
                 )
         except Exception as e:
             await self.query_audit_repository.finish(
@@ -115,47 +120,49 @@ class QueryService:
             error = {"type": "error", "message": str(e)}
             yield f"data: {json.dumps(error, ensure_ascii=False, default=str)}\n\n"
 
-    def _conversation_history(self, conversation_id: str | None) -> list[dict[str, Any]]:
+    async def _conversation_history(
+        self, conversation_id: str | None
+    ) -> list[dict[str, Any]]:
         """读取会话历史并转换为 State 可序列化结构"""
 
         if not conversation_id or not self.conversation_memory_store:
             return []
         history = []
-        for turn in self.conversation_memory_store.get_history(conversation_id):
+        for turn in await self.conversation_memory_store.get_history(conversation_id):
             history.append(
                 {
                     "role": turn.role,
                     "content": turn.content,
-                    "summary": turn.summary,
                 }
             )
         return history
 
-    def _append_memory(
+    async def _append_memory(
         self,
         conversation_id: str | None,
         query: str,
         resolved_query: str,
-        summary: str,
+        assistant_content: str,
     ) -> None:
         """将本轮成功响应写入会话短期记忆"""
 
         if not conversation_id or not self.conversation_memory_store:
             return
-        user_summary = (
-            f"补全问题：{resolved_query}" if resolved_query != query else "独立问题"
-        )
-        self.conversation_memory_store.append_turn(
+        await self.conversation_memory_store.append_message(
             conversation_id,
             role="user",
             content=query,
-            summary=user_summary,
         )
-        self.conversation_memory_store.append_turn(
+        if resolved_query != query:
+            assistant_content = f"补全后问题：{resolved_query}\n{assistant_content}"
+        await self.conversation_memory_store.append_message(
             conversation_id,
             role="assistant",
-            content="查询完成",
-            summary=summary,
+            content=assistant_content,
+        )
+        await self.conversation_memory_store.compact_if_needed(
+            conversation_id,
+            _compress_conversation_context,
         )
 
 
@@ -170,13 +177,13 @@ def _resolved_query_from_event(event: Any) -> str | None:
     return str(resolved_query) if resolved_query else None
 
 
-def _memory_summary_from_event(event: Any) -> str:
-    """从事件中提取查询结果摘要"""
+def _memory_content_from_event(event: Any) -> str:
+    """从事件中提取可写入会话历史的助手消息"""
     if not isinstance(event, dict):
         return ""
     event_type = event.get("type")
     if event_type == "result":
-        return _summarize_result(event.get("data"))
+        return f"查询完成，{_summarize_result(event.get('data'))}"
     if event_type == "answer":
         content = str(event.get("content") or "")
         return content[:200]
@@ -184,6 +191,7 @@ def _memory_summary_from_event(event: Any) -> str:
 
 
 def _summarize_result(data: Any) -> str:
+    """根据查询结果的结构生成简要描述，供助手消息使用"""
     if isinstance(data, list):
         row_count = len([row for row in data if isinstance(row, dict)])
         columns: list[str] = []
@@ -199,3 +207,20 @@ def _summarize_result(data: Any) -> str:
     if isinstance(data, dict):
         return f"返回 1 行，字段：{', '.join(str(key) for key in list(data.keys())[:8])}"
     return "查询完成"
+
+
+async def _compress_conversation_context(old_context, messages) -> str:
+    """将旧压缩上下文和较早消息滚动压缩成新的上下文"""
+
+    prompt = ChatPromptTemplate.from_template(load_prompt("compress_conversation_context"))
+    history = "\n".join(
+        f"{message.role}: {message.content}" for message in messages
+    )
+    chain = prompt | llm | StrOutputParser()
+    result = await chain.ainvoke(
+        {
+            "old_context": old_context or "无",
+            "history": history,
+        }
+    )
+    return str(result).strip()

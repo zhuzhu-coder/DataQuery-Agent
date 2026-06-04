@@ -60,6 +60,10 @@ async def collect_case_events(query_service: Any, case: dict[str, Any]) -> list[
         raise ValueError(f"用例 {case.get('id')} 的 conversation 必须是非空列表")
 
     conversation_id = f"eval-{case.get('id')}"
+    memory_store = getattr(query_service, "conversation_memory_store", None)
+    clear = getattr(memory_store, "clear", None)
+    if clear is not None:
+        await clear(conversation_id)
     events: list[dict[str, Any]] = []
     for question in conversation:
         events = await collect_query_events(

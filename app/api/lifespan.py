@@ -17,6 +17,7 @@ from app.clients.mysql_client_manager import (
     dw_mysql_client_manager,
     meta_mysql_client_manager,
 )
+from app.clients.redis_client_manager import redis_client_manager
 from app.repositories.mysql.meta.query_audit_repository import QueryAuditRepository
 
 
@@ -28,6 +29,7 @@ async def lifespan(app: FastAPI):
     milvus_client_manager.init() # 初始化 Milvus 客户端
     embedding_client_manager.init() # 初始化嵌入模型客户端
     es_client_manager.init() # 初始化 Elasticsearch 客户端
+    redis_client_manager.init() # 初始化 Redis 客户端
     meta_mysql_client_manager.init() # 初始化元数据库 MySQL 客户端
     dw_mysql_client_manager.init() # 初始化数据仓库 MySQL 客户端
     # 确保元数据库中存在查询审计表
@@ -41,5 +43,6 @@ async def lifespan(app: FastAPI):
     await embedding_client_manager.close()
     await milvus_client_manager.close()
     await es_client_manager.close()
+    await redis_client_manager.close()
     await meta_mysql_client_manager.close()
     await dw_mysql_client_manager.close()

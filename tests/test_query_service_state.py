@@ -43,25 +43,28 @@ class FakeResultGraph(FakeGraph):
 class FakeMemoryStore:
     def __init__(self):
         self.appended = []
+        self.compacted = []
 
-    def get_history(self, conversation_id: str):
+    async def get_history(self, conversation_id: str):
         return [
             ConversationTurn(
                 role="user",
                 content="统计 2026 年第一季度各大区 GMV",
-                summary="时间：2026Q1；维度：大区；指标：GMV",
             )
         ]
 
-    def append_turn(self, conversation_id: str, role: str, content: str, summary=None):
+    async def append_message(self, conversation_id: str, role: str, content: str):
         self.appended.append(
             {
                 "conversation_id": conversation_id,
                 "role": role,
                 "content": content,
-                "summary": summary,
             }
         )
+
+    async def compact_if_needed(self, conversation_id: str, compressor):
+        self.compacted.append(conversation_id)
+        return False
 
 
 class QueryServiceStateTest(unittest.IsolatedAsyncioTestCase):
@@ -124,9 +127,13 @@ class QueryServiceStateTest(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(len(memory_store.appended), 2)
         self.assertEqual(memory_store.appended[0]["role"], "user")
-        self.assertIn("补全问题", memory_store.appended[0]["summary"])
+        self.assertNotIn("summary", memory_store.appended[0])
+        self.assertEqual(memory_store.appended[0]["content"], "那华东呢？")
         self.assertEqual(memory_store.appended[1]["role"], "assistant")
-        self.assertIn("返回 1 行", memory_store.appended[1]["summary"])
+        self.assertNotIn("summary", memory_store.appended[1])
+        self.assertIn("补全后问题", memory_store.appended[1]["content"])
+        self.assertIn("返回 1 行", memory_store.appended[1]["content"])
+        self.assertEqual(memory_store.compacted, ["conv-1"])
 
 
 if __name__ == "__main__":

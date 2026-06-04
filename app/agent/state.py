@@ -102,18 +102,17 @@ class EvaluationResultState(TypedDict, total=False):
 
 
 class ConversationTurnState(TypedDict, total=False):
-    """当前会话中最近几轮问数摘要"""
+    """当前会话中用于上下文补全的消息"""
 
-    role: str # user/assistant
+    role: str # system/user/assistant
     content: str # 原始消息或结果描述
-    summary: str # 面向上下文补全的压缩摘要
 
 
 class DataQueryAgentState(TypedDict):
     """一次问数链路中的核心状态"""
 
     query: str  # 用户输入的查询
-    conversation_history: list[ConversationTurnState]  # 最近几轮会话摘要
+    conversation_history: list[ConversationTurnState]  # 最近几轮会话消息
     resolved_query: str  # 结合会话历史补全后的独立问题
     keywords: list[str]  # 从用户查询中抽取的关键词
     retrieved_column_infos: list[ColumnInfo]  # 检索到的字段信息

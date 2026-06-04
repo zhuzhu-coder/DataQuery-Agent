@@ -21,16 +21,15 @@ from app.clients.mysql_client_manager import (
     dw_mysql_client_manager,
     meta_mysql_client_manager,
 )
+from app.clients.redis_client_manager import redis_client_manager
+from app.conf.app_config import app_config
 from app.repositories.es.value_es_repository import ValueESRepository
 from app.repositories.mysql.dw.dw_mysql_repository import DWMySQLRepository
 from app.repositories.mysql.meta.meta_mysql_repository import MetaMySQLRepository
 from app.repositories.mysql.meta.query_audit_repository import QueryAuditRepository
 from app.repositories.vector.column_vector_repository import ColumnVectorRepository
 from app.repositories.vector.metric_vector_repository import MetricVectorRepository
-from app.services.conversation_memory import (
-    ConversationMemoryStore,
-    conversation_memory_store,
-)
+from app.services.conversation_memory import ConversationMemoryStore
 from app.services.query_service import QueryService
 
 
@@ -98,9 +97,15 @@ async def get_query_audit_repository(
 
 
 async def get_conversation_memory_store() -> ConversationMemoryStore:
-    """获取进程内会话短期记忆缓存"""
+    """创建 Redis 会话短期记忆存储"""
 
-    return conversation_memory_store
+    return ConversationMemoryStore(
+        redis_client=redis_client_manager.client,
+        key_prefix=app_config.redis.key_prefix,
+        ttl_seconds=app_config.redis.ttl_seconds,
+        max_messages_before_compaction=app_config.redis.max_messages_before_compaction,
+        recent_messages_after_compaction=app_config.redis.recent_messages_after_compaction,
+    )
 
 
 async def get_query_service(

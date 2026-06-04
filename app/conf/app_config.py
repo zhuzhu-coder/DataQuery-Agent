@@ -82,6 +82,20 @@ class ESConfig:
 
 
 @dataclass
+class RedisConfig:
+    """Redis 会话记忆配置"""
+
+    host: str # Redis 主机地址
+    port: int # Redis 端口号
+    db: int # Redis 数据库编号
+    password: str # Redis 密码
+    key_prefix: str # 会话记忆 Key 前缀
+    ttl_seconds: int # 会话记忆过期时间
+    max_messages_before_compaction: int # 触发上下文压缩的消息数阈值
+    recent_messages_after_compaction: int # 压缩后保留的最近消息数
+
+
+@dataclass
 class LLMConfig:
     """大模型调用配置"""
 
@@ -111,6 +125,7 @@ class AppConfig:
     milvus: MilvusConfig # Milvus 配置配置
     embedding: EmbeddingConfig # Embedding 服务配置
     es: ESConfig # Elasticsearch 配置
+    redis: RedisConfig # Redis 会话记忆配置
     llm: LLMConfig # 大模型调用配置
     sql_security: SQLSecurityConfig # SQL 安全治理配置
 
