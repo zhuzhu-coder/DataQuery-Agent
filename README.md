@@ -80,6 +80,16 @@ data-query-agent/
 └── pyproject.toml        # Python 项目依赖与工具配置
 ```
 
+## 界面预览
+
+### 查询执行流程
+
+![查询执行流程](docs/images/query-flow.png)
+
+### 查询结果展示
+
+![查询结果展示](docs/images/query-result.png)
+
 ## 快速开始
 
 ### 1. 准备环境
