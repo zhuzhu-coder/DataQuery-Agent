@@ -12,7 +12,6 @@ from langgraph.runtime import Runtime
 
 from app.agent.context import DataQueryAgentContext
 from app.agent.llm import llm
-from app.agent.observations import observation_update
 from app.agent.state import DataQueryAgentState, current_query
 from app.agent.trace import emit_trace
 from app.core.log import logger
@@ -95,11 +94,6 @@ async def correct_sql(state: DataQueryAgentState, runtime: Runtime[DataQueryAgen
             "error": None,
             "error_type": None,
             "correction_attempts": correction_attempts,
-            **observation_update(
-                "correct_sql",
-                f"完成第 {correction_attempts} 次 SQL 修正",
-                {"correction_attempts": correction_attempts},
-            ),
         }
     except Exception as e:
         logger.error(f"{step} failed: {e}")
@@ -119,9 +113,6 @@ def _correction_feedback(state: DataQueryAgentState) -> str:
         str(evaluation_result.get("reason") or ""),
         str(evaluation_result.get("suggested_fix") or ""),
     ]
-    issues = evaluation_result.get("issues") or []
-    if issues:
-        feedback_parts.append("；".join(str(issue) for issue in issues))
 
     feedback = "；".join(part for part in feedback_parts if part)
     return feedback or "SQL 语义评估未通过，请按原问题和上下文进行最小必要修正。"

@@ -7,8 +7,7 @@ State 是 LangGraph 各节点之间传递和更新的共享数据
 SQL 生成闭环会继续写入候选 SQL 以及校验错误信息，用于控制校正或执行分支
 """
 
-import operator
-from typing import Annotated, Any, TypedDict
+from typing import Any, TypedDict
 
 from app.entities.column_info import ColumnInfo
 from app.entities.metric_info import MetricInfo
@@ -62,33 +61,19 @@ class DBInfoState(TypedDict):
 
 
 class ToolCallState(TypedDict, total=False):
-    """Planner 生成的受控工具调用计划"""
+    """Agent 生成的受控工具调用计划"""
 
-    id: str # 工具调用 ID
     name: str # 工具名称
     args: dict[str, Any] # 工具参数，如 hints
-    reason: str # 调用该工具的原因
 
 
 class AgentPlanState(TypedDict, total=False):
-    """Planner 节点生成的当前任务执行计划"""
+    """Agent 生成的当前任务执行计划"""
 
     goal_summary: str # 本次问数目标摘要
-    metrics: list[str] # 用户问题涉及的指标
-    dimensions: list[str] # 用户问题涉及的分析维度
-    filters: list[str] # 用户问题涉及的过滤条件
     tool_calls: list[ToolCallState] # 当前任务需要执行的工具调用计划
     need_clarification: bool # 是否需要先向用户澄清
     clarification_question: str # 需要澄清时返回给用户的问题
-    reason: str # 计划生成原因
-
-
-class AgentObservationState(TypedDict, total=False):
-    """当前任务中工具节点产生的观察结果"""
-
-    tool: str # 产生观察的工具或节点名称
-    summary: str # 可读摘要
-    metadata: dict[str, Any] # 节点产出的结构化摘要信息
 
 
 class EvaluationResultState(TypedDict, total=False):
@@ -96,13 +81,12 @@ class EvaluationResultState(TypedDict, total=False):
 
     decision: str # pass/revise_sql/need_clarification/fail 等决策
     reason: str # 决策原因
-    issues: list[str] # 发现的问题
     suggested_fix: str # 建议修正方向
     clarification_question: str # 需要用户澄清时的问题
 
 
 class ConversationTurnState(TypedDict, total=False):
-    """当前会话中用于上下文补全的消息"""
+    """当前会话中用于入口解析的消息"""
 
     role: str # system/user/assistant
     content: str # 原始消息或结果描述
@@ -114,6 +98,10 @@ class DataQueryAgentState(TypedDict):
     query: str  # 用户输入的查询
     conversation_history: list[ConversationTurnState]  # 最近几轮会话消息
     resolved_query: str  # 结合会话历史补全后的独立问题
+
+    intent_category: str  # 入口意图分类
+    agent_plan: AgentPlanState  # 当前任务的执行计划
+
     keywords: list[str]  # 从用户查询中抽取的关键词
     retrieved_column_infos: list[ColumnInfo]  # 检索到的字段信息
     retrieved_metric_infos: list[MetricInfo]  # 检索到的指标信息
@@ -125,20 +113,13 @@ class DataQueryAgentState(TypedDict):
     db_info: DBInfoState  # 数据库方言和版本信息
 
     sql: str  # 生成或校正后的SQL
-
-    error: str  # 校验SQL时出现的错误信息
-    error_type: str  # 错误类型，如 syntax/security
+    error: str | None  # 校验SQL时出现的错误信息
+    error_type: str | None  # 错误类型，如 syntax/security
     correction_attempts: int  # SQL 修正次数
-    audit_id: str  # 查询审计记录 ID
-    intent_category: str  # 入口意图分类，如 data_query/general_chat/unsafe
-    intent_reason: str  # 入口意图分类原因
-
-    agent_plan: AgentPlanState  # 当前任务的 Planner 计划
-    agent_observations: Annotated[
-        list[AgentObservationState], operator.add
-    ]  # 当前任务内工具观察结果
     evaluation_result: EvaluationResultState  # SQL 语义评估反馈
     evaluation_attempts: int  # SQL 语义评估次数
+
+    audit_id: str  # 查询审计记录 ID
 
 
 def current_query(state: DataQueryAgentState) -> str:

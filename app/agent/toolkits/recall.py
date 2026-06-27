@@ -7,16 +7,11 @@ LangGraph 节点和 StructuredTool 都复用这里的实现
 
 from typing import Any, TypedDict
 
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.prompts import PromptTemplate
-
 from app.agent.context import DataQueryAgentContext
-from app.agent.llm import llm
 from app.core.log import logger
 from app.entities.column_info import ColumnInfo
 from app.entities.metric_info import MetricInfo
 from app.entities.value_info import ValueInfo
-from app.prompt.prompt_loader import load_prompt
 
 
 class RecallToolResult(TypedDict, total=False):
@@ -30,7 +25,6 @@ class RecallToolResult(TypedDict, total=False):
 
 
 async def run_recall_column(
-    query: str,
     keywords: list[str],
     hints: list[str],
     context: DataQueryAgentContext,
@@ -38,7 +32,6 @@ async def run_recall_column(
     """
     召回和用户问题语义相关的字段元数据
     Args:
-        query: 用户问题
         keywords: 关键词
         hints: 提示
         context: 运行时依赖
@@ -46,17 +39,10 @@ async def run_recall_column(
         召回结果
     """
 
-    # 扩展关键词
-    expanded_keywords = await _extend_keywords(
-        query=query,
-        prompt_name="extend_keywords_for_column_recall",
-        step="recall_column",
-    )
-
-    search_keywords = _merge_keywords(keywords, hints, expanded_keywords)
+    search_keywords = _merge_keywords(keywords, hints)
     column_vector_repository = context["column_vector_repository"]
     embedding_client = context["embedding_client"]
-
+    # 初始化空字典，用于存储召回的字段信息
     column_info_map: dict[str, ColumnInfo] = {}
     for keyword in search_keywords:
         try:
@@ -65,7 +51,7 @@ async def run_recall_column(
                 ColumnInfo
             ] = await column_vector_repository.search(embedding)
         except Exception as e:
-            logger.warning(f"recall_column skipped keyword {keyword!r}: {e}")
+            logger.warning(f"召回字段时出错 {keyword!r}: {e}")
             continue
         for column_info in current_column_infos:
             if column_info.id not in column_info_map:
@@ -73,17 +59,16 @@ async def run_recall_column(
 
     retrieved_column_infos = list(column_info_map.values())
     return {
-        "retrieved_column_infos": retrieved_column_infos,
+        "retrieved_column_infos": retrieved_column_infos, # 召回的字段信息
         "summary": f"召回 {len(retrieved_column_infos)} 个候选字段",
         "metadata": {
-            "column_count": len(retrieved_column_infos),
-            "keyword_count": len(search_keywords),
+            "column_count": len(retrieved_column_infos), # 召回的字段数量
+            "keyword_count": len(search_keywords), # 搜索关键词数量
         },
     }
 
 
 async def run_recall_metric(
-    query: str,
     keywords: list[str],
     hints: list[str],
     context: DataQueryAgentContext,
@@ -91,7 +76,6 @@ async def run_recall_metric(
     """
     召回和用户问题语义相关的业务指标
     Args:
-        query: 用户问题
         keywords: 关键词
         hints: 提示
         context: 运行时依赖
@@ -99,13 +83,7 @@ async def run_recall_metric(
         召回结果
     """
 
-    # 扩展关键词
-    expanded_keywords = await _extend_keywords(
-        query=query,
-        prompt_name="extend_keywords_for_metric_recall",
-        step="recall_metric",
-    )
-    search_keywords = _merge_keywords(keywords, hints, expanded_keywords)
+    search_keywords = _merge_keywords(keywords, hints)
     embedding_client = context["embedding_client"]
     metric_vector_repository = context["metric_vector_repository"]
 
@@ -117,7 +95,7 @@ async def run_recall_metric(
                 MetricInfo
             ] = await metric_vector_repository.search(embedding)
         except Exception as e:
-            logger.warning(f"recall_metric skipped keyword {keyword!r}: {e}")
+            logger.warning(f"召回指标时出错 {keyword!r}: {e}")
             continue
         for metric_info in current_metric_infos:
             if metric_info.id not in metric_info_map:
@@ -126,17 +104,16 @@ async def run_recall_metric(
     retrieved_metric_infos = list(metric_info_map.values())
     logger.info(f"检索到指标信息：{list(metric_info_map.keys())}")
     return {
-        "retrieved_metric_infos": retrieved_metric_infos,
+        "retrieved_metric_infos": retrieved_metric_infos, # 召回的指标信息
         "summary": f"召回 {len(retrieved_metric_infos)} 个候选指标",
         "metadata": {
-            "metric_count": len(retrieved_metric_infos),
-            "keyword_count": len(search_keywords),
+            "metric_count": len(retrieved_metric_infos), # 召回的指标数量
+            "keyword_count": len(search_keywords), # 搜索关键词数量
         },
     }
 
 
 async def run_recall_value(
-    query: str,
     keywords: list[str],
     hints: list[str],
     context: DataQueryAgentContext,
@@ -144,7 +121,6 @@ async def run_recall_value(
     """
     召回和用户问题相关的字段取值
     Args:
-        query: 用户问题
         keywords: 关键词
         hints: 提示
         context: 运行时依赖
@@ -152,13 +128,7 @@ async def run_recall_value(
         召回结果
     """
 
-    # 扩展关键词
-    expanded_keywords = await _extend_keywords(
-        query=query,
-        prompt_name="extend_keywords_for_value_recall",
-        step="recall_value",
-    )
-    search_keywords = _merge_keywords(keywords, hints, expanded_keywords)
+    search_keywords = _merge_keywords(keywords, hints)
     value_es_repository = context["value_es_repository"]
 
     value_infos_map: dict[str, ValueInfo] = {}
@@ -170,6 +140,7 @@ async def run_recall_value(
         except Exception as e:
             logger.warning(f"recall_value skipped keyword {keyword!r}: {e}")
             continue
+        # 过滤出字段取值
         for current_value_info in current_value_infos:
             if current_value_info.id not in value_infos_map:
                 value_infos_map[current_value_info.id] = current_value_info
@@ -177,43 +148,24 @@ async def run_recall_value(
     retrieved_value_infos = list(value_infos_map.values())
     logger.info(f"检索到字段取值：{list(value_infos_map.keys())}")
     return {
-        "retrieved_value_infos": retrieved_value_infos,
+        "retrieved_value_infos": retrieved_value_infos, # 召回的字段取值信息
         "summary": f"召回 {len(retrieved_value_infos)} 个候选字段取值",
         "metadata": {
-            "value_count": len(retrieved_value_infos),
-            "keyword_count": len(search_keywords),
+            "value_count": len(retrieved_value_infos), # 召回的字段取值数量
+            "keyword_count": len(search_keywords), # 搜索关键词数量
         },
     }
-
-
-async def _extend_keywords(query: str, prompt_name: str, step: str) -> list[str]:
-    """用 LLM 扩展召回关键词，失败时返回空列表"""
-
-    prompt = PromptTemplate(
-        template=load_prompt(prompt_name),
-        input_variables=["query"],
-    )
-    chain = prompt | llm | JsonOutputParser()
-    try:
-        result = await chain.ainvoke({"query": query})
-    except Exception as e:
-        logger.warning(f"{step} keyword expansion failed, fallback to inputs: {e}")
-        return []
-    if not isinstance(result, list):
-        return []
-    return [str(item) for item in result if item is not None]
 
 
 def _merge_keywords(
     keywords: list[str],
     hints: list[str],
-    expanded_keywords: list[str],
 ) -> list[str]:
-    """合并原始关键词、Planner hints 和扩展关键词并去重保序"""
+    """合并原始关键词和提示并去重保序"""
 
     merged: list[str] = []
     seen: set[str] = set()
-    for value in [*keywords, *hints, *expanded_keywords]:
+    for value in [*keywords, *hints]:
         text = str(value).strip()
         if not text or text in seen:
             continue

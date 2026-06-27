@@ -78,6 +78,7 @@ class SQLSecurityService:
         """检查 SQL 中的表是否在白名单中"""
         alias_to_table: dict[str, str] = {}
         for table in expression.find_all(exp.Table):
+            # 检查是否跨库查询
             if self.forbid_cross_database and table.db:
                 raise SQLSecurityError("不允许跨库查询")
 
@@ -101,6 +102,7 @@ class SQLSecurityService:
         select_aliases = self._select_aliases(expression)
 
         for star in expression.find_all(exp.Star):
+            # 检查是否在 COUNT 子句中
             if not isinstance(star.parent, exp.Count):
                 raise SQLSecurityError("不允许使用 SELECT *")
 
@@ -166,6 +168,7 @@ class SQLSecurityService:
         """从 SELECT 子句中提取所有输出别名"""
         if not isinstance(expression, exp.Select):
             return set()
+        #@ 从 SELECT 子句中提取所有输出别名
         return {
             alias
             for projection in expression.expressions
@@ -175,6 +178,7 @@ class SQLSecurityService:
     def _is_order_by_alias_reference(self, column: exp.Column) -> bool:
         """检查字段是否是 ORDER BY 子句引用的输出别名"""
         parent = column.parent
+        # 检查是否在 ORDER BY 子句中
         while parent is not None and not isinstance(parent, exp.Select):
             if isinstance(parent, exp.Order):
                 return True

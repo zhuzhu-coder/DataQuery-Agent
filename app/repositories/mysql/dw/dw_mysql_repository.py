@@ -28,6 +28,7 @@ class DWMySQLRepository:
         self, table_name: str, column_name: str, limit: int = 10
     ) -> list:
         """抽样查询字段示例值，供元数据入库和后续检索链路复用"""
+        # 从数仓中抽样查询字段示例值，避免查询所有数据
         sql = f"select distinct {column_name} from {table_name} limit {limit}"
         result = await self.session.execute(text(sql))
         return [row[0] for row in result.fetchall()]

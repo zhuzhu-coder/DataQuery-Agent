@@ -27,6 +27,7 @@ class MetaMySQLRepository:
     """负责把元数据业务实体持久化到 Meta MySQL"""
 
     def __init__(self, session: AsyncSession):
+        # 保存请求级 Session，后续操作会基于这个 Session 进行
         self.session = session 
 
     def save_table_infos(self, table_infos: list[TableInfo]):

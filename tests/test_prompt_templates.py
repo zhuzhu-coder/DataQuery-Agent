@@ -1,21 +1,44 @@
 import unittest
 
-from langchain_core.prompts import PromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from app.prompt.prompt_loader import load_prompt
 
 
 class PromptTemplatesTest(unittest.TestCase):
-    def test_classify_user_intent_prompt_formats_with_only_query_variable(self):
-        prompt = PromptTemplate(
-            template=load_prompt("classify_user_intent"),
-            input_variables=["query"],
+    def test_resolve_and_classify_prompt_formats_with_history_and_query_variables(self):
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", load_prompt("resolve_and_classify_user_intent")),
+                MessagesPlaceholder("history"),
+                ("human", "当前用户问题：{query}"),
+            ]
         )
 
-        formatted = prompt.format(query="你好")
+        formatted = prompt.format_messages(history=[], query="你好")
+        system_content = formatted[0].content
 
-        self.assertIn("用户问题：\n你好", formatted)
-        self.assertIn('{"category":"general_chat"', formatted)
+        self.assertEqual(set(prompt.input_variables), {"history", "query"})
+        self.assertIn('"category":"general_chat"', system_content)
+        self.assertIn("resolved_query", system_content)
+        self.assertIn("answer", system_content)
+        self.assertNotIn("is_follow_up", system_content)
+        self.assertNotIn("inherited_context", system_content)
+        self.assertNotIn("new_constraints", system_content)
+        self.assertNotIn("matched_terms", system_content)
+
+    def test_evaluate_sql_prompt_uses_compact_feedback_schema(self):
+        prompt = load_prompt("evaluate_sql_answer")
+
+        self.assertIn("decision", prompt)
+        self.assertIn("suggested_fix", prompt)
+        self.assertIn("clarification_question", prompt)
+        self.assertNotIn("issues", prompt)
+        self.assertNotIn("{agent_plan}", prompt)
+        self.assertNotIn("{table_infos}", prompt)
+        self.assertNotIn("{metric_infos}", prompt)
+        self.assertNotIn("{date_info}", prompt)
+        self.assertNotIn("{db_info}", prompt)
 
     def test_generate_sql_prompt_constrains_dates_and_qualified_columns(self):
         prompt = load_prompt("generate_sql")

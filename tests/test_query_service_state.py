@@ -33,8 +33,8 @@ class FakeResultGraph(FakeGraph):
         self.stream_mode = stream_mode
         yield {
             "type": "trace",
-            "step": "上下文补全",
-            "title": "完成上下文补全",
+            "step": "入口解析",
+            "title": "完成入口解析",
             "metadata": {"resolved_query": "统计 2026 年第一季度华东地区 GMV"},
         }
         yield {"type": "result", "data": [{"region_name": "华东", "gmv": 100}]}
@@ -92,11 +92,12 @@ class QueryServiceStateTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(chunks), 1)
         self.assertEqual(self.fake_graph.input["query"], "统计 GMV")
         self.assertIn("agent_plan", self.fake_graph.input)
-        self.assertIn("agent_observations", self.fake_graph.input)
+        self.assertNotIn("agent_observations", self.fake_graph.input)
+        self.assertNotIn("intent_reason", self.fake_graph.input)
+        self.assertNotIn("answer", self.fake_graph.input)
         self.assertIn("evaluation_result", self.fake_graph.input)
         self.assertIn("evaluation_attempts", self.fake_graph.input)
         self.assertEqual(self.fake_graph.input["agent_plan"], {})
-        self.assertEqual(self.fake_graph.input["agent_observations"], [])
         self.assertEqual(self.fake_graph.input["evaluation_result"], {})
         self.assertEqual(self.fake_graph.input["evaluation_attempts"], 0)
 

@@ -42,11 +42,8 @@ class QueryService:
         query_audit_repository: QueryAuditRepository, # 查询审计仓储
         conversation_memory_store: ConversationMemoryStore | None = None, # 会话级短期记忆
     ):
-        # MySQL 仓储分别负责元数据补全和真实数仓环境信息读取
         self.meta_mysql_repository = meta_mysql_repository
         self.dw_mysql_repository = dw_mysql_repository
-
-        # 召回链路依赖的向量检索、Embedding 和全文检索能力由依赖层注入
         self.embedding_client = embedding_client
         self.column_vector_repository = column_vector_repository
         self.metric_vector_repository = metric_vector_repository
@@ -68,12 +65,23 @@ class QueryService:
             query=query,
             conversation_history=conversation_history,
             resolved_query="",
-            audit_id=audit_id,
-            correction_attempts=0,
+            intent_category="",
             agent_plan={},
-            agent_observations=[],
+            keywords=[],
+            retrieved_column_infos=[],
+            retrieved_metric_infos=[],
+            retrieved_value_infos=[],
+            table_infos=[],
+            metric_infos=[],
+            date_info={},
+            db_info={},
+            sql="",
+            error=None,
+            error_type=None,
+            correction_attempts=0,
             evaluation_result={},
             evaluation_attempts=0,
+            audit_id=audit_id,
         )
         # Context 保存本次图执行需要复用的外部依赖，节点通过 runtime.context 读取
         context = DataQueryAgentContext(
@@ -94,10 +102,12 @@ class QueryService:
             ):
                 if isinstance(chunk, dict):
                     event_type = chunk.get("type")
-                    if event_type == "trace" and chunk.get("step") == "上下文补全":
+                    # 入口解析阶段，更新 resolved_query
+                    if event_type == "trace" and chunk.get("step") == "入口解析":
                         resolved_query = (
                             _resolved_query_from_event(chunk) or resolved_query
                         )
+                    # SQL 生成阶段，更新 assistant_memory_content
                     elif event_type in {"result", "answer"}:
                         assistant_memory_content = _memory_content_from_event(chunk)
                 # SSE 要求每条消息以 data: 开头，并以两个换行符结束
@@ -170,7 +180,7 @@ def _resolved_query_from_event(event: Any) -> str | None:
     """从事件中提取补全后的查询语句"""
     if not isinstance(event, dict):
         return None
-    if event.get("type") != "trace" or event.get("step") != "上下文补全":
+    if event.get("type") != "trace" or event.get("step") != "入口解析":
         return None
     metadata = event.get("metadata") or {}
     resolved_query = metadata.get("resolved_query")
@@ -193,7 +203,9 @@ def _memory_content_from_event(event: Any) -> str:
 def _summarize_result(data: Any) -> str:
     """根据查询结果的结构生成简要描述，供助手消息使用"""
     if isinstance(data, list):
+        # 统计有效行数
         row_count = len([row for row in data if isinstance(row, dict)])
+        # 提取所有字段名，去重并限制 8 个
         columns: list[str] = []
         for row in data:
             if not isinstance(row, dict):

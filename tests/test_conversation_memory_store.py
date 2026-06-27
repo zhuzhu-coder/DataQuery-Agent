@@ -21,6 +21,15 @@ class FakeRedis:
     async def llen(self, key):
         return len(self.values.get(key, []))
 
+    async def ltrim(self, key, start, end):
+        items = list(self.values.get(key, []))
+        length = len(items)
+        start = start + length if start < 0 else start
+        end = end + length if end < 0 else end
+        start = max(start, 0)
+        end = min(end, length - 1)
+        self.values[key] = items[start : end + 1] if start <= end else []
+
     async def delete(self, *keys):
         for key in keys:
             self.values.pop(key, None)

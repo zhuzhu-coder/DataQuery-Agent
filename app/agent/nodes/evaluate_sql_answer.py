@@ -7,14 +7,12 @@ SQL 答案评估节点
 
 from typing import Any
 
-import yaml
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import PromptTemplate
 from langgraph.runtime import Runtime
 
 from app.agent.context import DataQueryAgentContext
 from app.agent.llm import llm
-from app.agent.observations import observation_update
 from app.agent.state import DataQueryAgentState, EvaluationResultState, current_query
 from app.agent.trace import emit_trace
 from app.core.log import logger
@@ -42,7 +40,6 @@ async def evaluate_sql_answer(
             evaluation_result = EvaluationResultState(
                 decision="fail",
                 reason=f"SQL 语义评估失败：{e}",
-                issues=["评估器输出不可用"],
                 suggested_fix="",
                 clarification_question="",
             )
@@ -73,19 +70,10 @@ async def evaluate_sql_answer(
             },
         )
         return {
-            "evaluation_result": evaluation_result,
-            "evaluation_attempts": evaluation_attempts,
             "error": error,
             "error_type": error_type,
-            **observation_update(
-                "evaluate_sql_answer",
-                f"SQL 语义评估结果：{decision}",
-                {
-                    "decision": decision,
-                    "evaluation_attempts": evaluation_attempts,
-                    "issue_count": len(evaluation_result.get("issues") or []),
-                },
-            ),
+            "evaluation_result": evaluation_result,
+            "evaluation_attempts": evaluation_attempts,
         }
     except Exception as e:
         logger.error(f"{step} failed: {e}")
@@ -101,11 +89,6 @@ async def _evaluate_with_llm(payload: dict[str, Any]) -> dict:
         input_variables=[
             "query",
             "sql",
-            "agent_plan",
-            "table_infos",
-            "metric_infos",
-            "date_info",
-            "db_info",
         ],
     )
     chain = prompt | llm | JsonOutputParser()
@@ -117,21 +100,6 @@ def _build_prompt_payload(state: DataQueryAgentState) -> dict[str, Any]:
     return {
         "query": current_query(state),
         "sql": state["sql"],
-        "agent_plan": yaml.dump(
-            state.get("agent_plan") or {}, allow_unicode=True, sort_keys=False
-        ),
-        "table_infos": yaml.dump(
-            state.get("table_infos") or [], allow_unicode=True, sort_keys=False
-        ),
-        "metric_infos": yaml.dump(
-            state.get("metric_infos") or [], allow_unicode=True, sort_keys=False
-        ),
-        "date_info": yaml.dump(
-            state.get("date_info") or {}, allow_unicode=True, sort_keys=False
-        ),
-        "db_info": yaml.dump(
-            state.get("db_info") or {}, allow_unicode=True, sort_keys=False
-        ),
     }
 
 
@@ -147,17 +115,9 @@ def _normalize_evaluation(payload: object) -> EvaluationResultState:
     return EvaluationResultState(
         decision=decision,
         reason=str(payload.get("reason") or ""),
-        issues=_string_list(payload.get("issues")),
         suggested_fix=str(payload.get("suggested_fix") or ""),
         clarification_question=str(payload.get("clarification_question") or ""),
     )
-
-
-def _string_list(value: object) -> list[str]:
-    """将对象转换为字符串列表"""
-    if not isinstance(value, list):
-        return []
-    return [str(item) for item in value if item is not None]
 
 
 def _decision_title(decision: str) -> str:
@@ -171,9 +131,9 @@ def _decision_title(decision: str) -> str:
 
 def _trace_items(sql: str, evaluation_result: EvaluationResultState) -> list[dict[str, str]]:
     items = [{"label": "候选 SQL", "detail": sql}]
-    issues = evaluation_result.get("issues") or []
-    if issues:
-        items.append({"label": "发现问题", "detail": "；".join(issues)})
+    reason = evaluation_result.get("reason")
+    if reason:
+        items.append({"label": "评估结论", "detail": reason})
     suggested_fix = evaluation_result.get("suggested_fix")
     if suggested_fix:
         items.append({"label": "修正建议", "detail": suggested_fix})

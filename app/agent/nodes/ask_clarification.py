@@ -43,7 +43,7 @@ async def ask_clarification(
                 agent_plan.get("clarification_question")
                 or DEFAULT_CLARIFICATION_QUESTION
             )
-            reason = agent_plan.get("reason") or "Planner 判断当前问题需要补充查询口径。"
+            reason = "判断当前问题需要补充查询口径。"
 
         emit_trace(
             writer,

@@ -9,8 +9,8 @@ cases:
         - [region_name, 大区, 地区]
         - [GMV, gmv, 销售额]
       trace_steps:
-        - 意图安全检查
-        - 制定查询计划
+        - 入口解析
+        - 规划召回策略
         - 抽取关键词
         - 召回字段信息
         - 召回指标信息
@@ -20,7 +20,7 @@ cases:
         - 评估SQL答案
         - 执行SQL
       trace_metadata:
-        - step: 制定查询计划
+        - step: 规划召回策略
           key: need_clarification
           equals: false
         - step: 评估SQL答案
@@ -38,18 +38,18 @@ cases:
         - [销量, order_quantity]
         - [销售额, order_amount]
       trace_steps:
-        - 意图安全检查
-        - 制定查询计划
+        - 入口解析
+        - 规划召回策略
         - 抽取关键词
         - 召回字段信息
-        - 过滤表信息
+        - 过滤查询上下文
         - 生成SQL
         - 安全检查SQL
         - 校验SQL
         - 评估SQL答案
         - 执行SQL
       trace_metadata:
-        - step: 制定查询计划
+        - step: 规划召回策略
           key: need_clarification
           equals: false
         - step: 评估SQL答案
@@ -66,8 +66,8 @@ cases:
         - [product_name, 商品名称, 商品]
         - [销售额, order_amount]
       trace_steps:
-        - 意图安全检查
-        - 制定查询计划
+        - 入口解析
+        - 规划召回策略
         - 召回字段取值
         - 生成SQL
         - 安全检查SQL
@@ -75,7 +75,7 @@ cases:
         - 评估SQL答案
         - 执行SQL
       trace_metadata:
-        - step: 制定查询计划
+        - step: 规划召回策略
           key: need_clarification
           equals: false
         - step: 评估SQL答案
@@ -93,16 +93,16 @@ cases:
         - [订单数, COUNT]
         - [销售额, order_amount]
       trace_steps:
-        - 意图安全检查
-        - 制定查询计划
+        - 入口解析
+        - 规划召回策略
         - 召回字段信息
-        - 过滤指标信息
+        - 过滤查询上下文
         - 安全检查SQL
         - 校验SQL
         - 评估SQL答案
         - 执行SQL
       trace_metadata:
-        - step: 制定查询计划
+        - step: 规划召回策略
           key: need_clarification
           equals: false
         - step: 评估SQL答案
@@ -117,8 +117,8 @@ cases:
       column_any:
         - [product_name, 商品名称, 商品]
       trace_steps:
-        - 意图安全检查
-        - 制定查询计划
+        - 入口解析
+        - 规划召回策略
         - 抽取关键词
         - 召回字段信息
         - 生成SQL
@@ -127,7 +127,7 @@ cases:
         - 评估SQL答案
         - 执行SQL
       trace_metadata:
-        - step: 制定查询计划
+        - step: 规划召回策略
           key: need_clarification
           equals: false
         - step: 评估SQL答案
@@ -143,8 +143,8 @@ cases:
       column_any:
         - [product_name, 商品名称, 商品]
       trace_steps:
-        - 意图安全检查
-        - 制定查询计划
+        - 入口解析
+        - 规划召回策略
         - 召回字段取值
         - 生成SQL
         - 安全检查SQL
@@ -152,7 +152,7 @@ cases:
         - 评估SQL答案
         - 执行SQL
       trace_metadata:
-        - step: 制定查询计划
+        - step: 规划召回策略
           key: need_clarification
           equals: false
         - step: 评估SQL答案
@@ -170,9 +170,8 @@ cases:
       column_any:
         - [product_name, 商品名称, 商品]
       trace_steps:
-        - 上下文补全
-        - 意图安全检查
-        - 制定查询计划
+        - 入口解析
+        - 规划召回策略
         - 抽取关键词
         - 召回字段取值
         - 生成SQL
@@ -181,10 +180,10 @@ cases:
         - 评估SQL答案
         - 执行SQL
       trace_metadata:
-        - step: 上下文补全
+        - step: 入口解析
           key: is_follow_up
           equals: true
-        - step: 上下文补全
+        - step: 入口解析
           key: resolved_query
           contains: 华北
         - step: 评估SQL答案
@@ -197,7 +196,7 @@ cases:
       status: rejected
       error_contains: SELECT
       trace_steps:
-        - 意图安全检查
+        - 入口解析
         - 查询终止
 
   - id: unsafe_drop_table
@@ -206,7 +205,7 @@ cases:
       status: rejected
       error_contains: SELECT
       trace_steps:
-        - 意图安全检查
+        - 入口解析
         - 查询终止
 
   - id: hello_general_chat
@@ -215,8 +214,7 @@ cases:
       status: answered
       answer_contains: 数据
       trace_steps:
-        - 意图安全检查
-        - 普通回答
+        - 入口解析
 
   - id: capability_general_chat
     question: 你能做什么
@@ -224,5 +222,4 @@ cases:
       status: answered
       answer_contains: 电商数据
       trace_steps:
-        - 意图安全检查
-        - 普通回答
+        - 入口解析

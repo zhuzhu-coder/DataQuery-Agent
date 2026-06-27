@@ -26,21 +26,18 @@ class EvaluateSQLAnswerNodeTest(unittest.TestCase):
             "db_info": {},
             "agent_plan": {
                 "goal_summary": "统计 2026 年第一季度各大区 GMV",
-                "metrics": ["GMV"],
-                "dimensions": ["大区"],
-                "filters": ["2026 年第一季度"],
             },
             "evaluation_attempts": 0,
         }
         model_result = {
             "decision": "pass",
             "reason": "SQL 覆盖了指标和维度。",
-            "issues": [],
             "suggested_fix": "",
             "clarification_question": "",
         }
 
         async def fake_evaluate(payload):
+            self.assertEqual(set(payload), {"query", "sql"})
             self.assertEqual(payload["query"], state["query"])
             self.assertEqual(payload["sql"], state["sql"])
             return model_result
@@ -64,7 +61,7 @@ class EvaluateSQLAnswerNodeTest(unittest.TestCase):
             "metric_infos": [],
             "date_info": {},
             "db_info": {},
-            "agent_plan": {"filters": ["华东地区"]},
+            "agent_plan": {"goal_summary": "统计华东地区销售额"},
             "evaluation_attempts": 0,
         }
 
@@ -72,7 +69,6 @@ class EvaluateSQLAnswerNodeTest(unittest.TestCase):
             return {
                 "decision": "revise_sql",
                 "reason": "缺少华东地区过滤条件。",
-                "issues": ["遗漏地区过滤条件"],
                 "suggested_fix": "补充华东地区 WHERE 条件。",
             }
 

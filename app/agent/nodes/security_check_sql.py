@@ -8,7 +8,6 @@ SQL 安全检查节点
 from langgraph.runtime import Runtime
 
 from app.agent.context import DataQueryAgentContext
-from app.agent.observations import observation_update
 from app.agent.state import DataQueryAgentState
 from app.agent.trace import emit_trace
 from app.conf.app_config import app_config
@@ -30,6 +29,7 @@ async def security_check_sql(
         audit_id = state.get("audit_id")
         audit_repository = runtime.context.get("query_audit_repository")
 
+        # 未启用安全检查，直接返回 SQL 不进行校验
         if not app_config.sql_security.enabled:
             writer({"type": "progress", "step": step, "status": "success"})
             emit_trace(
@@ -41,11 +41,6 @@ async def security_check_sql(
             return {
                 "error": None,
                 "error_type": None,
-                **observation_update(
-                    "security_check_sql",
-                    "SQL 安全检查已关闭",
-                    {"enabled": False},
-                ),
             }
 
         service = SQLSecurityService(
@@ -75,14 +70,6 @@ async def security_check_sql(
             "sql": safe_sql,
             "error": None,
             "error_type": None,
-            **observation_update(
-                "security_check_sql",
-                "SQL 安全检查通过",
-                {
-                    "enabled": True,
-                    "max_rows": app_config.sql_security.max_rows,
-                },
-            ),
         }
 
     except SQLSecurityError as e:
@@ -99,11 +86,6 @@ async def security_check_sql(
         return {
             "error": message,
             "error_type": "security",
-            **observation_update(
-                "security_check_sql",
-                f"SQL 安全检查未通过：{message}",
-                {"enabled": True, "error_type": "security"},
-            ),
         }
 
     except Exception as e:

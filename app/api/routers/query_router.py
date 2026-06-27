@@ -15,7 +15,6 @@ from app.api.dependencies import get_query_service
 from app.api.schemas.query_schema import QuerySchema
 from app.services.query_service import QueryService
 
-# 当前模块只维护查询相关接口，避免后续所有 API 都挤在 main.py 中
 # 创建路由对象
 query_router = APIRouter()
 

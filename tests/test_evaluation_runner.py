@@ -14,7 +14,7 @@ class FakeQueryService:
             {"question": question, "conversation_id": conversation_id}
         )
         yield (
-            'data: {"type": "trace", "step": "上下文补全", '
+            'data: {"type": "trace", "step": "入口解析", '
             f'"metadata": {{"resolved_query": "{question}"}}}}\n\n'
         )
 
@@ -109,19 +109,18 @@ class EvaluationRunnerTest(unittest.TestCase):
         self.assertEqual(result["status"], "rejected")
         self.assertEqual(result["error_message"], "仅允许执行 SELECT 查询")
 
-    def test_evaluate_case_passes_general_answer_expectations(self):
+    def test_evaluate_case_passes_entry_direct_answer_expectations(self):
         case = {
             "id": "hello",
             "question": "你好",
             "expect": {
                 "status": "answered",
                 "answer_contains": "Data Query Agent",
-                "trace_steps": ["意图安全检查", "普通回答"],
+                "trace_steps": ["入口解析"],
             },
         }
         events = [
-            {"type": "trace", "step": "意图安全检查"},
-            {"type": "trace", "step": "普通回答"},
+            {"type": "trace", "step": "入口解析"},
             {
                 "type": "answer",
                 "content": "你好，我是 Data Query Agent，可以帮你查询电商数据。",
@@ -142,7 +141,7 @@ class EvaluationRunnerTest(unittest.TestCase):
                 "status": "success",
                 "trace_metadata": [
                     {
-                        "step": "制定查询计划",
+                        "step": "规划召回策略",
                         "key": "need_clarification",
                         "equals": False,
                     },
@@ -157,7 +156,7 @@ class EvaluationRunnerTest(unittest.TestCase):
         events = [
             {
                 "type": "trace",
-                "step": "制定查询计划",
+                "step": "规划召回策略",
                 "metadata": {"need_clarification": False},
             },
             {
@@ -213,7 +212,7 @@ class EvaluationRunnerTest(unittest.TestCase):
                 "status": "success",
                 "trace_metadata": [
                     {
-                        "step": "上下文补全",
+                        "step": "入口解析",
                         "key": "resolved_query",
                         "contains": "华东",
                     }
@@ -223,7 +222,7 @@ class EvaluationRunnerTest(unittest.TestCase):
         events = [
             {
                 "type": "trace",
-                "step": "上下文补全",
+                "step": "入口解析",
                 "metadata": {"resolved_query": "统计 2026 年第一季度华东地区 GMV"},
             },
             {"type": "result", "data": [{"GMV": 100}]},
@@ -241,7 +240,7 @@ class EvaluationRunnerTest(unittest.TestCase):
                 "status": "success",
                 "trace_metadata": [
                     {
-                        "step": "上下文补全",
+                        "step": "入口解析",
                         "key": "resolved_query",
                         "contains": "华东",
                     }
@@ -251,7 +250,7 @@ class EvaluationRunnerTest(unittest.TestCase):
         events = [
             {
                 "type": "trace",
-                "step": "上下文补全",
+                "step": "入口解析",
                 "metadata": {"resolved_query": "统计 2026 年第一季度华北地区 GMV"},
             },
             {"type": "result", "data": [{"GMV": 100}]},
@@ -261,7 +260,7 @@ class EvaluationRunnerTest(unittest.TestCase):
 
         self.assertFalse(result["passed"])
         self.assertIn(
-            "轨迹元数据不包含：节点 上下文补全 的 resolved_query 期望包含 华东",
+            "轨迹元数据不包含：节点 入口解析 的 resolved_query 期望包含 华东",
             result["failures"][0],
         )
 

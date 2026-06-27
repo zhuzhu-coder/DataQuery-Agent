@@ -36,6 +36,7 @@ class MilvusClientManager:
         if self.client is None:
             return
         result = self.client.close()
+        # 判断是否为异步操作，确保关闭操作完成
         if inspect.isawaitable(result):
             await result
 

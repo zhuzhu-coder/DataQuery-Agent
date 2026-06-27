@@ -35,7 +35,6 @@ from app.services.query_service import QueryService
 
 async def get_meta_session():
     """创建一次请求内使用的元数据库 Session"""
-
     # yield 之后的清理逻辑由 async with 负责，FastAPI 会在请求结束后继续执行退出流程
     async with meta_mysql_client_manager.session_factory() as meta_session:
         yield meta_session
@@ -45,7 +44,6 @@ async def get_meta_mysql_repository(
     session: Annotated[AsyncSession, Depends(get_meta_session)],
 ) -> MetaMySQLRepository:
     """基于请求级 Session 创建元数据仓储"""
-
     return MetaMySQLRepository(session)
 
 
@@ -57,7 +55,6 @@ async def get_embedding_client() -> EmbeddingClient:
 
 async def get_dw_session():
     """创建一次请求内使用的数仓 Session"""
-
     async with dw_mysql_client_manager.session_factory() as dw_session:
         yield dw_session
 
@@ -66,25 +63,21 @@ async def get_dw_mysql_repository(
     session: Annotated[AsyncSession, Depends(get_dw_session)],
 ) -> DWMySQLRepository:
     """基于请求级 Session 创建数仓仓储"""
-
     return DWMySQLRepository(session)
 
 
 async def get_column_vector_repository() -> ColumnVectorRepository:
     """创建字段向量检索仓储"""
-
     return ColumnVectorRepository(milvus_client_manager.client)
 
 
 async def get_metric_vector_repository() -> MetricVectorRepository:
     """创建指标向量检索仓储"""
-
     return MetricVectorRepository(milvus_client_manager.client)
 
 
 async def get_value_es_repository() -> ValueESRepository:
     """创建字段取值全文检索仓储"""
-
     return ValueESRepository(es_client_manager.client)
 
 
@@ -92,7 +85,6 @@ async def get_query_audit_repository(
     session: Annotated[AsyncSession, Depends(get_meta_session)],
 ) -> QueryAuditRepository:
     """创建查询审计仓储"""
-
     return QueryAuditRepository(session)
 
 
@@ -109,25 +101,35 @@ async def get_conversation_memory_store() -> ConversationMemoryStore:
 
 
 async def get_query_service(
+    # 元数据仓储
     meta_mysql_repository: Annotated[
         MetaMySQLRepository, Depends(get_meta_mysql_repository)
     ], 
+    # 嵌入模型客户端
     embedding_client: Annotated[
         EmbeddingClient, Depends(get_embedding_client)
     ],
+    # 数仓仓储
     dw_mysql_repository: Annotated[
         DWMySQLRepository, Depends(get_dw_mysql_repository)
     ],
+    # 字段向量仓储
     column_vector_repository: Annotated[
         ColumnVectorRepository, Depends(get_column_vector_repository)
     ],
+    # 指标向量仓储
     metric_vector_repository: Annotated[
         MetricVectorRepository, Depends(get_metric_vector_repository)
     ],
-    value_es_repository: Annotated[ValueESRepository, Depends(get_value_es_repository)],
+    # 字段取值全文检索仓储
+    value_es_repository: Annotated[
+        ValueESRepository, Depends(get_value_es_repository)
+    ],
+    # 查询审计仓储
     query_audit_repository: Annotated[
         QueryAuditRepository, Depends(get_query_audit_repository)
     ],
+    # 会话短期记忆存储
     memory_store: Annotated[
         ConversationMemoryStore, Depends(get_conversation_memory_store)
     ],

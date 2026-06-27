@@ -64,7 +64,7 @@ eval/reports/latest.md
   expect:
     status: success
     trace_steps:
-      - 上下文补全
+      - 入口解析
       - 执行SQL
 ```
 
@@ -72,7 +72,7 @@ eval/reports/latest.md
 
 ```yaml
 trace_metadata:
-  - step: 制定查询计划
+  - step: 规划召回策略
     key: need_clarification
     equals: false
   - step: 评估SQL答案
@@ -80,11 +80,11 @@ trace_metadata:
     equals: pass
 ```
 
-字符串类元数据可以使用 `contains` 做包含断言，适合检查上下文补全后的问题：
+字符串类元数据可以使用 `contains` 做包含断言，适合检查入口解析补全后的问题：
 
 ```yaml
 trace_metadata:
-  - step: 上下文补全
+  - step: 入口解析
     key: resolved_query
     contains: 华北
 ```

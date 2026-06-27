@@ -72,9 +72,11 @@ class QueryAuditRepository:
         """更新生成 SQL 或最终安全 SQL"""
         fields = []
         params = {"id": audit_id}
+        # 有生成 SQL，更新生成 SQL 字段
         if generated_sql is not None:
             fields.append("generated_sql = :generated_sql")
             params["generated_sql"] = generated_sql
+        # 有最终安全 SQL，更新最终安全 SQL 字段
         if final_sql is not None:
             fields.append("final_sql = :final_sql")
             params["final_sql"] = final_sql

@@ -22,6 +22,7 @@ class ColumnVectorRepository:
 
     async def ensure_collection(self):
         """确保字段向量集合存在，并按配置中的维度初始化"""
+        # 检查集合是否存在
         if await self.client.has_collection(self.collection_name):
             return
 
@@ -35,7 +36,7 @@ class ColumnVectorRepository:
             dim=app_config.milvus.embedding_size,  # 向量维度
         )
         schema.add_field("payload", DataType.JSON)  # 用来保存该向量对应的原始字段元数据
-
+        # 创建索引
         index_params = MilvusClient.prepare_index_params()  # 索引参数
         index_params.add_index(
             field_name="vector",  # 索引字段

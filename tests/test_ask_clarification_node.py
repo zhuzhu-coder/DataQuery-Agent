@@ -32,7 +32,6 @@ class AskClarificationNodeTest(unittest.TestCase):
             "agent_plan": {
                 "need_clarification": True,
                 "clarification_question": "你想查看哪个时间范围的销售额？",
-                "reason": "缺少时间范围。",
             },
         }
 
@@ -43,7 +42,7 @@ class AskClarificationNodeTest(unittest.TestCase):
 
         self.assertEqual(answer_events[-1]["content"], "你想查看哪个时间范围的销售额？")
         self.assertEqual(trace_events[-1]["step"], "需要澄清")
-        self.assertIn("缺少时间范围", trace_events[-1]["summary"])
+        self.assertIn("补充查询口径", trace_events[-1]["summary"])
         self.assertEqual(runtime.context["query_audit_repository"].status, "answered")
         self.assertEqual(runtime.context["query_audit_repository"].row_count, 0)
 

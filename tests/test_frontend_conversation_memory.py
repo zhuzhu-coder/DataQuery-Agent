@@ -20,7 +20,7 @@ class FrontendConversationMemoryTest(unittest.TestCase):
         self.assertIn("conversationIdRef", app_source)
         self.assertIn("conversationId: conversationIdRef.current", app_source)
 
-    def test_step_rail_shows_optional_context_node(self):
+    def test_step_rail_shows_entry_resolution_node(self):
         source = (
             Path(__file__).resolve().parents[1]
             / "frontend"
@@ -29,9 +29,9 @@ class FrontendConversationMemoryTest(unittest.TestCase):
             / "StepRail.tsx"
         ).read_text(encoding="utf-8")
 
-        self.assertIn('step: "上下文补全"', source)
+        self.assertIn('step: "入口解析"', source)
         self.assertIn('"M430 48 L430 86"', source)
-        self.assertIn('"M342 112 L48 112 L48 1112 L132 1112"', source)
+        self.assertIn('"M342 28 L48 28 L48 1008 L132 1008"', source)
 
 
 if __name__ == "__main__":

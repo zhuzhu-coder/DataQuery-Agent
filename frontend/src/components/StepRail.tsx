@@ -30,69 +30,62 @@ type BranchLabel = {
 };
 
 const nodes: FlowNode[] = [
-  { step: "上下文补全", x: 430, y: 8 },
-  { step: "意图安全检查", displayName: "意图识别", x: 430, y: 92, w: 176 },
-  { step: "普通回答", x: 694, y: 93 },
-  { step: "制定查询计划", x: 430, y: 184, w: 176 },
-  { step: "抽取关键词", x: 430, y: 276 },
-  { step: "执行工具", x: 430, y: 368 },
-  { step: "召回字段信息", label: "recall_column", caption: "字段召回", kind: "tool", toolName: "recall_column", x: 210, y: 460, w: 178 },
-  { step: "召回指标信息", label: "recall_metric", caption: "指标召回", kind: "tool", toolName: "recall_metric", x: 430, y: 460, w: 178 },
-  { step: "召回字段取值", label: "recall_value", caption: "取值召回", kind: "tool", toolName: "recall_value", x: 650, y: 460, w: 178 },
-  { step: "合并召回信息", x: 430, y: 572, w: 176 },
-  { step: "过滤指标信息", x: 310, y: 676 },
-  { step: "过滤表信息", x: 550, y: 676 },
-  { step: "需要澄清", x: 775, y: 676, w: 140 },
-  { step: "添加额外上下文", x: 430, y: 780, w: 176 },
-  { step: "生成SQL", x: 430, y: 884 },
-  { step: "安全检查SQL", x: 430, y: 988, w: 176 },
-  { step: "查询终止", x: 210, y: 1092 },
-  { step: "校验SQL", x: 430, y: 1092 },
-  { step: "校正SQL", x: 650, y: 1092 },
-  { step: "评估SQL答案", x: 430, y: 1196, w: 176 },
-  { step: "执行SQL", x: 430, y: 1300 },
+  { step: "入口解析", displayName: "入口意图解析", x: 430, y: 8, w: 176 },
+  { step: "规划召回策略", x: 430, y: 92, w: 176 },
+  { step: "抽取关键词", x: 430, y: 184 },
+  { step: "执行工具", x: 430, y: 276 },
+  { step: "召回字段信息", label: "recall_column", caption: "字段召回", kind: "tool", toolName: "recall_column", x: 210, y: 368, w: 178 },
+  { step: "召回指标信息", label: "recall_metric", caption: "指标召回", kind: "tool", toolName: "recall_metric", x: 430, y: 368, w: 178 },
+  { step: "召回字段取值", label: "recall_value", caption: "取值召回", kind: "tool", toolName: "recall_value", x: 650, y: 368, w: 178 },
+  { step: "合并召回信息", x: 430, y: 480, w: 176 },
+  { step: "过滤查询上下文", x: 430, y: 584, w: 176 },
+  { step: "需要澄清", x: 775, y: 584, w: 140 },
+  { step: "添加额外上下文", x: 430, y: 688, w: 176 },
+  { step: "生成SQL", x: 430, y: 792 },
+  { step: "安全检查SQL", x: 430, y: 896, w: 176 },
+  { step: "查询终止", x: 210, y: 988 },
+  { step: "校验SQL", x: 430, y: 988 },
+  { step: "校正SQL", x: 650, y: 988 },
+  { step: "评估SQL答案", x: 430, y: 1092, w: 176 },
+  { step: "执行SQL", x: 430, y: 1196 },
 ];
 
 const connectors = [
   "M430 48 L430 86",
-  "M342 112 L48 112 L48 1112 L132 1112",
-  "M518 112 L612 112",
+  "M342 28 L48 28 L48 1008 L132 1008",
+  "M518 112 L775 112 L775 578",
   "M430 132 L430 178",
-  "M518 204 L775 204 L775 670",
   "M430 224 L430 270",
+  "M430 316 L430 340 L210 340 L210 362",
   "M430 316 L430 362",
-  "M430 408 L430 432 L210 432 L210 454",
-  "M430 408 L430 454",
-  "M430 408 L430 432 L650 432 L650 454",
-  "M210 506 L210 534 L430 534 L430 566",
-  "M430 506 L430 566",
-  "M650 506 L650 534 L430 534 L430 566",
-  "M430 612 L430 640 L310 640 L310 670",
-  "M430 612 L430 640 L550 640 L550 670",
-  "M310 716 L310 744 L430 744 L430 774",
-  "M550 716 L550 744 L430 744 L430 774",
-  "M430 826 L430 878",
-  "M430 930 L430 982",
-  "M342 1008 L210 1008 L210 1086",
+  "M430 316 L430 340 L650 340 L650 362",
+  "M210 414 L210 442 L430 442 L430 474",
+  "M430 414 L430 474",
+  "M650 414 L650 442 L430 442 L430 474",
+  "M430 520 L430 578",
+  "M430 624 L430 682",
+  "M430 734 L430 786",
+  "M430 838 L430 890",
+  "M342 916 L210 916 L210 982",
+  "M430 938 L430 982",
+  "M508 1008 L572 1008",
   "M430 1030 L430 1086",
-  "M508 1112 L572 1112",
+  "M650 988 L650 916 L524 916",
   "M430 1134 L430 1190",
-  "M650 1092 L650 1008 L524 1008",
-  "M430 1238 L430 1294",
-  "M518 1216 L650 1216 L650 1138",
-  "M518 1216 L775 1216 L775 722",
-  "M342 1216 L210 1216 L210 1138",
+  "M518 1112 L650 1112 L650 1034",
+  "M518 1112 L775 1112 L775 630",
+  "M342 1112 L210 1112 L210 1034",
 ];
 
 const branchLabels: BranchLabel[] = [
-  { text: "不安全", x: 195, y: 104 },
-  { text: "需澄清", x: 646, y: 196 },
-  { text: "安全未通过", x: 276, y: 1000 },
-  { text: "未通过", x: 540, y: 1104 },
-  { text: "校正后复检", x: 587, y: 1000 },
-  { text: "语义校正", x: 584, y: 1208 },
-  { text: "需澄清", x: 735, y: 972 },
-  { text: "评估失败", x: 276, y: 1208 },
+  { text: "不安全", x: 195, y: 20 },
+  { text: "需澄清", x: 646, y: 104 },
+  { text: "安全未通过", x: 276, y: 908 },
+  { text: "未通过", x: 540, y: 1000 },
+  { text: "校正后复检", x: 587, y: 908 },
+  { text: "语义校正", x: 584, y: 1104 },
+  { text: "需澄清", x: 735, y: 880 },
+  { text: "评估失败", x: 276, y: 1104 },
 ];
 
 function getStatusMap(steps: StepState[]) {
@@ -277,10 +270,10 @@ export function StepRail({
       </div>
 
       <div className="overflow-x-hidden">
-        <div className="relative mx-auto h-[1356px] w-[900px]">
+        <div className="relative mx-auto h-[1252px] w-[900px]">
           <svg
             className="pointer-events-none absolute inset-0 h-full w-full"
-            viewBox="0 0 900 1356"
+            viewBox="0 0 900 1252"
             fill="none"
             aria-hidden="true"
           >

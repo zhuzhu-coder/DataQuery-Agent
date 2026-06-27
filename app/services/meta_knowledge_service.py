@@ -41,17 +41,17 @@ class MetaKnowledgeService:
         value_es_repository: ValueESRepository,
         metric_vector_repository: MetricVectorRepository,
     ):
-        # meta repository 负责结构化元数据的落库
+        # 元数据库仓储
         self.meta_mysql_repository: MetaMySQLRepository = meta_mysql_repository
-        # dw repository 负责到教学数仓中读取真实表结构和示例值
+        # 数仓仓储
         self.dw_mysql_repository: DWMySQLRepository = dw_mysql_repository
-        # 字段向量集合的创建和写入统一交给向量 Repository
+        # 字段向量仓储
         self.column_vector_repository: ColumnVectorRepository = column_vector_repository
-        # 向量化动作放在 Service 层
+        # 嵌入模型客户端
         self.embedding_client: EmbeddingClient = embedding_client
-        # 字段值全文索引的写入统一交给 ES Repository
+        # 字段取值全文索引仓储
         self.value_es_repository: ValueESRepository = value_es_repository
-        # 指标向量集合和字段向量集合分开管理，便于后续按对象类型独立召回
+        # 指标向量仓储
         self.metric_vector_repository: MetricVectorRepository = metric_vector_repository
 
     async def _save_tables_to_meta_db(
@@ -102,7 +102,7 @@ class MetaKnowledgeService:
     async def _save_column_info_to_vector_store(self, column_infos: list[ColumnInfo]):
         """把字段元数据继续推进成可语义检索的向量点"""
         await self.column_vector_repository.ensure_collection()
-
+        # 初始化向量点列表
         points: list[dict] = []
         for column_info in column_infos:
             # 一个字段不会只生成一个向量点，而是把名字 描述 别名都拆开建立语义入口
@@ -158,14 +158,15 @@ class MetaKnowledgeService:
         """把允许同步的字段真实取值写入 Elasticsearch 全文索引"""
         await self.value_es_repository.ensure_index()
 
-        # 不是所有字段都要同步真实值，是否同步由配置里的 sync 显式控制
+        # 初始化字段同步映射
         column2sync: dict[str, bool] = {}
         for table in meta_config.tables:
             for column in table.columns:
                 column2sync[f"{table.name}.{column.name}"] = column.sync
-
+        # 初始化值信息列表
         value_infos: list[ValueInfo] = []
         for column_info in column_infos:
+            # 检查字段是否需要同步真实值
             sync = column2sync[column_info.id]
             if sync:
                 # 这里拿的是字段真实取值，最多拿 100000 条
@@ -190,8 +191,10 @@ class MetaKnowledgeService:
         self, meta_config: MetaConfig
     ) -> list[MetricInfo]:
         """把配置里的指标信息和字段依赖关系写入 Meta MySQL"""
-        metric_infos: list[MetricInfo] = [] # 指标信息列表
-        column_metrics: list[ColumnMetric] = [] # 字段指标依赖关系列表
+        # 指标信息列表
+        metric_infos: list[MetricInfo] = []
+        # 字段指标依赖关系列表
+        column_metrics: list[ColumnMetric] = []
 
         for metric in meta_config.metrics:
             # MetricInfo 表达指标本身，当前直接用指标名作为稳定业务 id
@@ -291,7 +294,7 @@ class MetaKnowledgeService:
         if meta_config.metrics:
             # 将指标信息和字段依赖关系保存到 Meta MySQL
             metric_infos = await self._save_metrics_to_meta_db(meta_config)
-            logger.info("保存指标信息到数据库成功")
+            logger.info("保存指标信息到 Meta MySQL 成功")
 
             # 对指标信息建立向量索引
             await self._save_metrics_to_vector_store(metric_infos)

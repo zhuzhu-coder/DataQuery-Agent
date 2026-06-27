@@ -20,10 +20,8 @@ class MergeRetrievedInfoDynamicRouteTest(unittest.TestCase):
             "agent_plan": {
                 "tool_calls": [
                     {
-                        "id": "tool_1",
                         "name": "recall_metric",
                         "args": {"hints": ["GMV"]},
-                        "reason": "需要指标召回",
                     }
                 ],
             },

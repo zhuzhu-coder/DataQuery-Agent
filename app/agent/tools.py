@@ -4,11 +4,9 @@ Agent 工具注册表
 集中声明 Planner 可以选择和 Tool Executor 可以执行的受控工具
 """
 
-from typing import Any, Awaitable, Callable, TypedDict
+from typing import Awaitable, Callable, TypedDict
 
 import yaml
-from langchain_core.tools import StructuredTool
-from pydantic import BaseModel, Field
 
 from app.agent.context import DataQueryAgentContext
 from app.agent.state import ToolCallState
@@ -27,19 +25,9 @@ class AgentToolSpec(TypedDict):
     description: str
 
 
-class RecallToolInput(BaseModel):
-    """召回类工具统一输入"""
-
-    query: str = Field(description="用户原始问题")
-    keywords: list[str] = Field(default_factory=list, description="抽取后的关键词")
-    hints: list[str] = Field(
-        default_factory=list,
-        description="Planner 为该工具提供的补充提示词",
-    )
-
 # 定义内部工具函数统一类型
 ToolRunner = Callable[
-    [str, list[str], list[str], DataQueryAgentContext],
+    [list[str], list[str], DataQueryAgentContext],
     Awaitable[RecallToolResult],
 ]
 
@@ -78,9 +66,11 @@ def normalize_tool_calls(value: object) -> list[ToolCallState]:
 
     if not isinstance(value, list):
         return default_tool_calls()
-
+    # 筛选出允许的工具名称
     allowed_tool_names = set(available_tool_names())
+    # 初始化空列表，用于存储有效工具调用
     tool_calls: list[ToolCallState] = []
+    # 记录已处理的工具名称，避免重复调用
     seen_tool_names: set[str] = set()
     for item in value:
         if not isinstance(item, dict):
@@ -92,10 +82,8 @@ def normalize_tool_calls(value: object) -> list[ToolCallState]:
         args = item.get("args") if isinstance(item.get("args"), dict) else {}
         tool_calls.append(
             ToolCallState(
-                id=str(item.get("id") or f"tool_{len(tool_calls) + 1}"),
                 name=tool_name,
                 args={"hints": _string_list(args.get("hints"))},
-                reason=str(item.get("reason") or ""),
             )
         )
 
@@ -107,55 +95,17 @@ def default_tool_calls() -> list[ToolCallState]:
 
     return [
         ToolCallState(
-            id=f"tool_{index}",
             name=tool_name,
             args={"hints": []},
-            reason="Planner 未给出有效工具调用，使用三路召回兜底。",
         )
-        for index, tool_name in enumerate(available_tool_names(), start=1)
+        for tool_name in available_tool_names()
     ]
 
 
 def render_tool_specs() -> str:
-    """渲染可注入 Planner Prompt 的工具清单"""
-
+    """渲染可注入 Planner Prompt 的工具清单，用于描述可用工具"""
+    # 转换为 YAML 格式，允许中文字符，不排序键
     return yaml.dump(AVAILABLE_TOOLS, allow_unicode=True, sort_keys=False)
-
-
-def build_agent_tools(
-    context: DataQueryAgentContext,
-) -> dict[str, StructuredTool]:
-    """构建 Tool Executor 可执行的 LangChain StructuredTool 注册表"""
-
-    specs_by_name = {tool["name"]: tool for tool in AVAILABLE_TOOLS}
-    return {
-        tool_name: StructuredTool.from_function(
-            coroutine=_build_tool_coroutine(tool_name, runner, context),
-            name=tool_name,
-            description=specs_by_name[tool_name]["description"],
-            args_schema=RecallToolInput,
-        )
-        for tool_name, runner in TOOL_RUNNERS.items()
-    }
-
-
-def _build_tool_coroutine(
-    tool_name: str,
-    runner: ToolRunner,
-    context: DataQueryAgentContext,
-) -> Callable[..., Awaitable[dict[str, Any]]]:
-    """把内部召回函数适配为 StructuredTool coroutine"""
-
-    async def _tool(
-        query: str,
-        keywords: list[str] | None = None,
-        hints: list[str] | None = None,
-    ) -> dict[str, Any]:
-        result = await runner(query, keywords or [], hints or [], context)
-        return dict(result)
-
-    _tool.__name__ = tool_name
-    return _tool
 
 
 def _string_list(value: object) -> list[str]:

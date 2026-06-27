@@ -39,7 +39,7 @@ class ConversationMemoryStore:
         self.recent_messages_after_compaction = recent_messages_after_compaction
 
     async def get_history(self, conversation_id: str) -> list[ConversationTurn]:
-        """读取压缩上下文和当前活跃消息，供上下文补全节点使用"""
+        """读取压缩上下文和当前活跃消息，供入口解析节点使用"""
         # 读取压缩上下文
         compressed_context = await self._get_compressed_context(conversation_id)
         # 读取当前活跃消息
@@ -89,8 +89,6 @@ class ConversationMemoryStore:
         keep_count = max(1, self.recent_messages_after_compaction)
         # 压缩消息
         compact_messages = active_messages[:-keep_count]
-        # 最近消息
-        recent_messages = active_messages[-keep_count:]
         if not compact_messages:
             return False
 
@@ -105,19 +103,8 @@ class ConversationMemoryStore:
         messages_key = self._messages_key(conversation_id)
         # 写入新压缩上下文，覆盖旧上下文
         await self.redis.set(context_key, new_context, ex=self.ttl_seconds)
-        # 删除旧消息
-        await self.redis.delete(messages_key)
-        if recent_messages:
-            await self.redis.rpush(
-                messages_key,
-                *[
-                    json.dumps(
-                        {"role": message.role, "content": message.content},
-                        ensure_ascii=False,
-                    )
-                    for message in recent_messages
-                ],
-            )
+        # 只保留最近消息窗口，较早消息已进入压缩上下文
+        await self.redis.ltrim(messages_key, -keep_count, -1)
         await self._refresh_ttl(conversation_id)
         return True
 
@@ -133,6 +120,7 @@ class ConversationMemoryStore:
         self, conversation_id: str
     ) -> list[ConversationTurn]:
         """读取当前活跃消息"""
+        # 读取所有消息
         items = await self.redis.lrange(self._messages_key(conversation_id), 0, -1)
         messages: list[ConversationTurn] = []
         for item in items:
@@ -167,6 +155,7 @@ class ConversationMemoryStore:
 def _load_json(value: Any) -> Any:
     """安全地解析 JSON，失败时返回 None"""
     try:
+        # 解码为字符串，再解析 JSON
         return json.loads(_decode_text(value))
     except (TypeError, ValueError):
         return None
